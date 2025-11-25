@@ -1,0 +1,16 @@
+{
+  "pear": [
+    {"name": "A字半身裙", "pic": "/static/img/pear_1.jpg", "desc": "修饰胯宽"},
+    {"name": "泡泡袖上衣", "pic": "/static/img/pear_2.jpg", "desc": "平衡上半身"}
+  ],
+  "inverted_triangle": [
+    {"name": "V领衬衫", "pic": "/static/img/v_shirt.jpg", "desc": "弱化肩部线条"}
+  ],
+  "hourglass": [
+    {"name": "收腰连衣裙", "pic": "/static/img/dress.jpg", "desc": "突显腰线"}
+  ],
+  "rectangle": [
+    {"name": "高腰阔腿裤", "pic": "/static/img/pants.jpg", "desc": "制造腰线"}
+  ],
+  "unknown": []
+}
