@@ -8,7 +8,7 @@ from typing import List
 
 # === 1. 导入或定义模型 ===
 try:
-    from models.user import UserProfile
+    from models.user_model import UserProfile
 except ImportError:
     from pydantic import BaseModel
 
@@ -20,6 +20,8 @@ except ImportError:
         height: float
         weight: float
         style_preferences: List[str] = []
+
+from api import analysis_routes
 
 # === 2. 初始化配置 ===
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -106,6 +108,7 @@ async def get_user(user_id: str):
             return {"status": "success", "data": user}
     return {"status": "error", "message": "用户不存在"}
 
+app.include_router(analysis_routes.router, prefix="/api/analysis", tags=["AI分析结果"])
 
 if __name__ == "__main__":
     import uvicorn

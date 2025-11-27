@@ -1,1 +1,13 @@
-[]
+[
+    {
+        "user_id": "001",
+        "gender": "male",
+        "age": 19,
+        "height": 180.0,
+        "weight": 160.0,
+        "body_type": "strong",
+        "created_at": "2025-11-26 15:30:04",
+        "style_preferences": [],
+        "analysis_records": []
+    }
+] 
