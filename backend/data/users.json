@@ -1,0 +1,16 @@
+[
+    {
+        "user_id": "test_user_001",
+        "gender": "female",
+        "age": 25,
+        "height": 165.5,
+        "weight": 50.0,
+        "body_type": null,
+        "created_at": "2025-12-01 16:13:02",
+        "style_preferences": [
+            "简约",
+            "休闲"
+        ],
+        "analysis_records": []
+    }
+]

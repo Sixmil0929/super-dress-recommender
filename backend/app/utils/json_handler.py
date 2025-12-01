@@ -1,8 +1,8 @@
 import json
 import os
 
-# 获取当前文件所在目录的上上级目录作为基础路径
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# 获取当前文件所在目录的上上上级目录作为基础路径
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DATA_FILE = os.path.join(BASE_DIR, "data", "users.json")
 
 

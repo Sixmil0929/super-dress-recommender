@@ -24,7 +24,7 @@ except ImportError:
 from api import analysis_routes
 
 # === 2. 初始化配置 ===
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_FILE = os.path.join(BASE_DIR, "data", "users.json")
 
 app = FastAPI(title="智能服装推荐系统 API")
@@ -112,5 +112,7 @@ app.include_router(analysis_routes.router, prefix="/api/analysis", tags=["AI分�
 
 if __name__ == "__main__":
     import uvicorn
+    print("正在启动服务...")
+    print(f"数据文件路径: {DATA_FILE}")
 
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)

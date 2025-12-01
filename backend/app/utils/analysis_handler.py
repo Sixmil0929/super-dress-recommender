@@ -5,7 +5,7 @@ from datetime import datetime
 from utils.json_handler import load_all_users, save_user_data # 复用之前的用户工具
 
 # 定义存储目录: backend/data/results/
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 RESULTS_DIR = os.path.join(BASE_DIR, "data", "results")
 
 def ensure_results_dir():
