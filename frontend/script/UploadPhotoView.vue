@@ -1,272 +1,405 @@
 <script setup>
-import { ref } from 'vue';
+import { ref } from "vue";
 
-// 定义事件，用于通知父组件返回主页
-const emit = defineEmits(['back-to-home']);
+// 保持队友定义的事件，用于返回主页
+const emit = defineEmits(["back-to-home"]);
 
-// 响应式数据：用于存储用户上传的图片文件或URL
-const uploadedImage = ref(null); 
+// 响应式数据
+const uploadedImage = ref(null);
 const isUploading = ref(false);
 
-// 响应式数据：用于存储手动输入的身材指标
+// 保持队友定义的手动输入数据结构
 const manualMetrics = ref({
-    shoulderWidth: null, // 肩宽
-    legLength: null,    // 腿长
-    bust: null,         // 胸围
-    waist: null,        // 腰围
-    hip: null,          // 臀围
+  shoulderWidth: null, // 肩宽
+  legLength: null, // 腿长
+  bust: null, // 胸围
+  waist: null, // 腰围
+  hip: null, // 臀围
 });
 
-// 模拟文件上传逻辑
+// 文件上传逻辑 (逻辑保持不变，只是为了适配新UI微调了变量名)
 const handleFileUpload = (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
+  const file = event.target.files[0];
+  if (!file) return;
 
-    // 检查文件类型，确保是图片
-    if (!file.type.startsWith('image/')) {
-        alert('请上传图片格式的文件！');
-        return;
-    }
-    
-    // 使用 FileReader 显示图片预览
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        uploadedImage.value = e.target.result; // 图片预览 URL
-    };
-    reader.readAsDataURL(file);
-    
-    console.log('文件已选择:', file.name);
+  if (!file.type.startsWith("image/")) {
+    alert("请上传图片格式的文件！");
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    uploadedImage.value = e.target.result;
+  };
+  reader.readAsDataURL(file);
 };
 
-// 模拟调用 AI 分析并提交数据的函数
+// 提交逻辑
 const analyzeAndSubmit = () => {
-    isUploading.value = true;
-    console.log('手动输入数据:', manualMetrics.value);
-    
-    // 实际项目中：
-    // 1. 如果有 uploadedImage，调用百度 AI API
-    // 2. 如果有 manualMetrics，直接调用后端计算函数
-    
-    // 模拟 2 秒的分析时间
-    setTimeout(() => {
-        isUploading.value = false;
-        alert('AI 分析完成，即将为您生成专属推荐！');
-        // 实际：提交成功后，返回主页
-        emit('back-to-home');
-    }, 2000);
+  // 简单的校验：要么传了图，要么填了数据
+  const hasManualData = Object.values(manualMetrics.value).some(
+    (val) => val !== null && val !== ""
+  );
+
+  if (!uploadedImage.value && !hasManualData) {
+    alert("请至少上传一张照片，或填写一项身材数据");
+    return;
+  }
+
+  isUploading.value = true;
+  console.log("提交的数据:", {
+    img: uploadedImage.value,
+    metrics: manualMetrics.value,
+  });
+
+  // 模拟 AI 分析过程
+  setTimeout(() => {
+    isUploading.value = false;
+    alert("✨ 分析完成！即将为您生成专属推荐");
+    emit("back-to-home");
+  }, 1500);
 };
 </script>
 
 <template>
-  <div class="upload-view-container">
-    <header class="upload-header">
-        <h2>📸 AI 身材分析与推荐</h2>
-        <button class="back-btn" @click="emit('back-to-home')">返回主页</button>
-    </header>
+  <div class="page-container">
+    <!-- 顶部导航栏 (毛玻璃效果) -->
+    <nav class="navbar">
+      <div class="nav-content">
+        <button class="icon-btn" @click="emit('back-to-home')">← 返回</button>
+        <span class="nav-title">身材分析</span>
+        <div style="width: 40px"></div>
+        <!-- 占位，让标题居中 -->
+      </div>
+    </nav>
 
-    <div class="analysis-area">
-      
-      <div class="tip-card">
-        <h3>💡 照片拍摄指南</h3>
-        <p>请确保照片清晰，露出全身，并尽量避免穿着过于宽松的衣物，以提高分析准确性。</p>
+    <!-- 内容区域 -->
+    <div class="main-content">
+      <div class="header-text">
+        <h2>开启智能穿搭</h2>
+        <p>AI 自动识别或手动录入，为您定制专属风格</p>
       </div>
 
-      <div class="content-wrapper">
-        
-        <div class="upload-section">
-          <h3>上传全身照片</h3>
-          <div 
-            class="image-drop-zone" 
+      <div class="cards-wrapper">
+        <!-- 左侧：图片上传卡片 -->
+        <div class="glass-card upload-card">
+          <div class="card-header">
+            <span class="emoji">📸</span>
+            <h3>上传全身照</h3>
+          </div>
+
+          <div
+            class="upload-zone"
             @click="$refs.fileInput.click()"
-            :class="{'has-image': uploadedImage}"
+            :class="{ 'has-image': uploadedImage }"
           >
-            <input 
-              type="file" 
-              ref="fileInput" 
-              @change="handleFileUpload" 
-              accept="image/*" 
-              style="display: none;" 
+            <input
+              type="file"
+              ref="fileInput"
+              @change="handleFileUpload"
+              accept="image/*"
+              style="display: none"
             />
-            
-            <img v-if="uploadedImage" :src="uploadedImage" alt="用户全身照" class="uploaded-image-preview" />
-            
-            <div v-else class="upload-placeholder-text">
-                点击或拖放图片至此上传
-                <p class="small-text">（JPG/PNG 格式，最大 5MB）</p>
+
+            <img
+              v-if="uploadedImage"
+              :src="uploadedImage"
+              class="preview-img"
+            />
+
+            <div v-else class="placeholder">
+              <div class="icon-plus">+</div>
+              <p>点击选择图片</p>
+              <span>支持 JPG / PNG</span>
             </div>
           </div>
-          
         </div>
 
-        <div class="manual-input-section">
-          <h3>或 手动输入身材数据</h3>
-          <form class="metrics-form">
-            <div class="form-group">
-              <label>肩宽 (cm):</label>
-              <input type="number" v-model.number="manualMetrics.shoulderWidth" placeholder="如 42">
+        <!-- 右侧：手动输入卡片 -->
+        <div class="glass-card metrics-card">
+          <div class="card-header">
+            <span class="emoji">✏️</span>
+            <h3>手动微调数据 (可选)</h3>
+          </div>
+
+          <div class="form-grid">
+            <div class="input-group">
+              <label>肩宽</label>
+              <input
+                type="number"
+                v-model.number="manualMetrics.shoulderWidth"
+                placeholder="cm"
+              />
             </div>
-            <div class="form-group">
-              <label>腿长 (cm):</label>
-              <input type="number" v-model.number="manualMetrics.legLength" placeholder="如 105">
+            <div class="input-group">
+              <label>胸围</label>
+              <input
+                type="number"
+                v-model.number="manualMetrics.bust"
+                placeholder="cm"
+              />
             </div>
-            <div class="form-group">
-              <label>胸围 (cm):</label>
-              <input type="number" v-model.number="manualMetrics.bust" placeholder="如 90">
+            <div class="input-group">
+              <label>腰围</label>
+              <input
+                type="number"
+                v-model.number="manualMetrics.waist"
+                placeholder="cm"
+              />
             </div>
-            <div class="form-group">
-              <label>腰围 (cm):</label>
-              <input type="number" v-model.number="manualMetrics.waist" placeholder="如 70">
+            <div class="input-group">
+              <label>臀围</label>
+              <input
+                type="number"
+                v-model.number="manualMetrics.hip"
+                placeholder="cm"
+              />
             </div>
-            <div class="form-group">
-              <label>臀围 (cm):</label>
-              <input type="number" v-model.number="manualMetrics.hip" placeholder="如 95">
+            <div class="input-group full-width">
+              <label>腿长</label>
+              <input
+                type="number"
+                v-model.number="manualMetrics.legLength"
+                placeholder="cm"
+              />
             </div>
-          </form>
-          
+          </div>
         </div>
       </div>
-      
-      <button 
-        class="submit-analysis-btn" 
-        @click="analyzeAndSubmit"
-        :disabled="isUploading"
-      >
-        {{ isUploading ? '正在分析中...' : '启动 AI 分析并推荐' }}
-      </button>
 
+      <!-- 底部提交按钮 -->
+      <div class="action-area">
+        <button
+          class="analyze-btn"
+          @click="analyzeAndSubmit"
+          :disabled="isUploading"
+        >
+          <span v-if="isUploading" class="loading-dots">正在分析...</span>
+          <span v-else>✨ 开始 AI 分析</span>
+        </button>
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.upload-view-container {
-    padding: 0;
-    margin: 0;
-    min-height: 100vh;
-    background-color: #f4f7f9;
-}
-.upload-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 15px 30px;
-    background-color: #6c757d; 
-    color: white;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-.upload-header h2 {
-    margin: 0;
-}
-.back-btn {
-    padding: 8px 15px;
-    background-color: #f0ad4e;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
+/* 全局容器：Apple 高级灰背景 */
+.page-container {
+  min-height: 100vh;
+  background-color: #f5f5f7;
+  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  padding-top: 60px; /* 留出导航栏高度 */
 }
 
-.analysis-area {
-    max-width: 900px;
-    margin: 40px auto;
-    padding: 30px;
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+/* 顶部导航栏：毛玻璃 */
+.navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 60px;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  z-index: 100;
 }
 
-.tip-card {
-    background-color: #eaf5ff;
-    border: 1px solid #b3d9ff;
-    padding: 15px;
-    border-radius: 8px;
-    margin-bottom: 25px;
-}
-.tip-card h3 {
-    color: #007bff;
-    margin-top: 0;
+.nav-content {
+  max-width: 1000px;
+  margin: 0 auto;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
 }
 
-.content-wrapper {
-    display: flex;
-    gap: 30px;
-    margin-bottom: 30px;
+.nav-title {
+  font-weight: 600;
+  font-size: 17px;
+  color: #1d1d1f;
 }
 
-.upload-section, .manual-input-section {
-    flex: 1;
+.icon-btn {
+  background: none;
+  border: none;
+  color: #0071e3;
+  font-size: 16px;
+  cursor: pointer;
+  font-weight: 500;
 }
 
-/* --- 图片上传区样式 --- */
-.image-drop-zone {
-    height: 350px;
-    border: 3px dashed #ccc;
-    border-radius: 10px;
-    display: flex;
+/* 主内容区 */
+.main-content {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 40px 20px;
+}
+
+.header-text {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.header-text h2 {
+  font-size: 32px;
+  font-weight: 700;
+  margin-bottom: 10px;
+  color: #1d1d1f;
+}
+
+.header-text p {
+  color: #86868b;
+  font-size: 18px;
+}
+
+/* 卡片布局 */
+.cards-wrapper {
+  display: flex;
+  gap: 30px;
+  margin-bottom: 40px;
+}
+
+@media (max-width: 768px) {
+  .cards-wrapper {
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.2s;
-    background-color: #fafafa;
-    overflow: hidden;
+  }
 }
 
-.image-drop-zone.has-image {
-    border: none;
+/* 通用玻璃卡片 */
+.glass-card {
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 30px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
+  flex: 1;
+  transition: transform 0.3s ease;
 }
 
-.uploaded-image-preview {
-    max-height: 100%;
-    max-width: 100%;
-    object-fit: contain;
+.glass-card:hover {
+  transform: translateY(-5px);
 }
 
-.upload-placeholder-text {
-    color: #888;
-    text-align: center;
+.card-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 20px;
 }
 
-.small-text {
-    font-size: 0.8em;
-    color: #aaa;
-    margin-top: 5px;
+.emoji {
+  font-size: 24px;
+  margin-right: 10px;
 }
 
-/* --- 手动输入区样式 --- */
-.metrics-form .form-group {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 15px;
-}
-.metrics-form input {
-    width: 60%;
-    padding: 8px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
+.card-header h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
 }
 
-/* --- 提交按钮样式 --- */
-.submit-analysis-btn {
-    width: 100%;
-    padding: 15px;
-    background-color: #dc3545; /* 醒目的红色 */
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-size: 1.2em;
-    font-weight: bold;
-    cursor: pointer;
-    transition: background-color 0.3s;
+/* 上传区域样式 */
+.upload-zone {
+  border: 2px dashed #d2d2d7;
+  border-radius: 16px;
+  height: 300px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  background: #fafafa;
+  transition: all 0.3s;
+  overflow: hidden;
+  position: relative;
 }
 
-.submit-analysis-btn:hover:not(:disabled) {
-    background-color: #c82333;
+.upload-zone:hover {
+  background: #f0f8ff;
+  border-color: #0071e3;
 }
 
-.submit-analysis-btn:disabled {
-    background-color: #ff9999;
-    cursor: not-allowed;
+.placeholder {
+  text-align: center;
+  color: #86868b;
+}
+
+.icon-plus {
+  font-size: 40px;
+  color: #0071e3;
+  margin-bottom: 10px;
+}
+
+.preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* 手动输入表单样式 */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.full-width {
+  grid-column: span 2;
+}
+
+.input-group label {
+  display: block;
+  font-size: 13px;
+  color: #86868b;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.input-group input {
+  width: 100%;
+  padding: 12px;
+  background: #f5f5f7;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  color: #1d1d1f;
+  box-sizing: border-box;
+  transition: background 0.2s;
+}
+
+.input-group input:focus {
+  background: #e8e8ed;
+  outline: none;
+}
+
+/* 底部大按钮 */
+.action-area {
+  text-align: center;
+}
+
+.analyze-btn {
+  background: #0071e3;
+  color: white;
+  font-size: 18px;
+  font-weight: 600;
+  padding: 16px 60px;
+  border: none;
+  border-radius: 99px;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(0, 113, 227, 0.4);
+  transition: all 0.2s;
+}
+
+.analyze-btn:hover {
+  background: #0077ed;
+  transform: scale(1.02);
+}
+
+.analyze-btn:active {
+  transform: scale(0.98);
+}
+
+.analyze-btn:disabled {
+  background: #a1a1a6;
+  box-shadow: none;
+  cursor: not-allowed;
 }
 </style>
