@@ -1,0 +1,29 @@
+# 忽略视频和文档
+*.mp4
+*.pptx
+*.docx
+
+# 忽略图片和画图文件
+*.png
+*.jpg
+*.jpeg
+*.svg
+*.drawio.png
+
+# 忽略 Python 生成的缓存垃圾文件
+__pycache__/
+*.pyc
+
+# 忽略巨大的数据集和模型权重文件夹
+DeepFashion_Data/
+images/
+models/
+weights/
+P1_Dataset/
+P2_Dataset/
+P3_Dataset/
+P4_Dataset/
+P5_Dataset/
+
+# 忽略 Python 虚拟环境
+.venv/

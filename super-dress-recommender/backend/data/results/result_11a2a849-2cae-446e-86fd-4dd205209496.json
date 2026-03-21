@@ -1,0 +1,18 @@
+{
+    "analysis_id": "11a2a849-2cae-446e-86fd-4dd205209496",
+    "user_id": "15",
+    "timestamp": "2025-12-06T23:10:16.423682",
+    "image_path": "d:\\NoahProject\\super-dress-recommender\\backend\\data\\uploads\\86b38586-34d4-4c48-bf0b-cc579028f069.png",
+    "ai_result": {
+        "status": "success",
+        "data": {
+            "type": "inverted_triangle",
+            "type_name": "倒三角形 (V型 / 草莓型)",
+            "ratios": {
+                "shoulder_hip": 1.75,
+                "head_body": 4.5,
+                "waist_hip": 0.9
+            }
+        }
+    }
+}

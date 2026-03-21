@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  db:
+    # 必须使用带 pgvector 的镜像，否则向量数据无法导入！
+    image: pgvector/pgvector:pg16
+    container_name: dress_select_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123456
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      # 这行极其关键：只要 init.sql 在这个目录下，Docker 第一次启动时就会自动导入数据！
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      # 挂载本地目录以持久化数据（防止容器重启数据丢失）
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

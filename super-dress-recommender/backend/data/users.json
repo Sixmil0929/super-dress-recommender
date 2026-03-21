@@ -1,0 +1,13 @@
+[
+    {
+        "user_id": "cb512342-e007-4062-915f-91fb875064e6",
+        "phone": "13800138000",
+        "password": "123456",
+        "created_at": "2025-12-04 19:51:44",
+        "gender": "string",
+        "age": 0,
+        "height": 0.0,
+        "weight": 0.0,
+        "style_preferences": []
+    }
+]

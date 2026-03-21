@@ -1,0 +1,126 @@
+# ============================================================
+# 前端项目依赖清单 (Frontend Dependencies)
+# 项目名称: 服装推荐系统 - 前端 (Dress Recommendation System - Frontend)
+# 构建工具: Vite
+# 框架: Vue 3
+# ============================================================
+
+frontend:
+  name: "dress-recommendation-frontend"
+  version: "0.0.1"
+  description: "AI-powered dress recommendation system frontend"
+  language: "JavaScript/Node.js"
+  
+  # Node.js 版本要求
+  node_version: ">=16.0.0"  # 推荐 18.x 或 20.x LTS
+  npm_version: ">=8.0.0"
+
+  # ============================================================
+  # 核心依赖 (Production Dependencies)
+  # ============================================================
+  dependencies:
+    vue:
+      version: "^3.5.24"
+      description: "Vue.js 核心库（Progressive JavaScript Framework）"
+      npm_package: "vue"
+      usage: "UI 框架，组件开发"
+
+  # ============================================================
+  # 开发依赖 (Development Dependencies)
+  # ============================================================
+  devDependencies:
+    vite:
+      version: "^7.2.2"
+      description: "超快的前端构建工具"
+      npm_package: "vite"
+      usage: "开发服务器、打包、HMR (Hot Module Replacement)"
+
+    "@vitejs/plugin-vue":
+      version: "^6.0.1"
+      description: "Vite 的 Vue 3 官方插件"
+      npm_package: "@vitejs/plugin-vue"
+      usage: "支持 .vue 单文件组件的编译"
+
+  # ============================================================
+  # 可选推荐库 (Optional but recommended)
+  # ============================================================
+  optional_dependencies:
+    # 状态管理
+    pinia:
+      version: "^2.1.7"
+      description: "Vue 3 官方状态管理库（替代 Vuex）"
+      usage: "跨组件数据管理、复杂状态管理"
+      install_command: "npm install pinia"
+
+    # 路由管理
+    vue-router:
+      version: "^4.3.2"
+      description: "Vue 官方路由库"
+      usage: "页面路由、导航管理"
+      install_command: "npm install vue-router"
+
+    # HTTP 请求
+    axios:
+      version: "^1.7.2"
+      description: "基于 Promise 的 HTTP 客户端"
+      usage: "与后端 API 通信"
+      install_command: "npm install axios"
+
+    # UI 组件库
+    element-plus:
+      version: "^2.6.3"
+      description: "Vue 3 UI 组件库"
+      usage: "预构建组件（按钮、表单、弹窗等）"
+      install_command: "npm install element-plus"
+
+    # 代码质量工具
+    eslint:
+      version: "^9.0.0"
+      description: "JavaScript 代码检查工具"
+      usage: "代码风格统一、bug 检测"
+      install_command: "npm install -D eslint @vue/eslint-config-standard eslint-plugin-vue"
+
+    prettier:
+      version: "^3.1.1"
+      description: "代码格式化工具"
+      usage: "自动格式化代码"
+      install_command: "npm install -D prettier eslint-config-prettier"
+
+    typescript:
+      version: "^5.3.3"
+      description: "JavaScript 超集，添加静态类型"
+      usage: "类型检查、IDE 智能提示"
+      install_command: "npm install -D typescript"
+
+  # ============================================================
+  # 快速启动命令
+  # ============================================================
+  scripts:
+    dev: "vite"                    # 启动开发服务器 (localhost:5173)
+    build: "vite build"            # 打包到 dist/
+    preview: "vite preview"        # 预览打包后的文件
+
+  # ============================================================
+  # 环境信息
+  # ============================================================
+  environment:
+    os: "Windows / macOS / Linux"
+    editor: "Visual Studio Code (推荐)"
+    vscode_extensions:
+      - "Volar (Vue 3 语言支持)"
+      - "ESLint (代码检查)"
+      - "Prettier (代码格式化)"
+      - "HTML CSS Support (HTML/CSS 辅助)"
+
+  # ============================================================
+  # 与后端接口约定
+  # ============================================================
+  backend_api:
+    base_url: "http://localhost:8000"  # 后端服务地址（开发环境）
+    timeout: "5000ms"
+    endpoints:
+      - "POST /api/auth/login          # 用户登录"
+      - "POST /api/auth/register       # 用户注册"
+      - "POST /api/user/profile        # 上传用户资料"
+      - "POST /api/photo/analyze       # 上传照片进行 AI 分析"
+      - "GET  /api/recommendations     # 获取推荐商品列表"

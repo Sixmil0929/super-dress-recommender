@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>服装全量标签审查</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+        body { font-family: system-ui, sans-serif; background: #1e1e2f; color: #fff; padding: 20px; margin: 0; }
+        .header { position: sticky; top: 0; background: rgba(30, 30, 47, 0.95); padding: 15px 0; z-index: 100; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; }
+        .stats { font-size: 20px; font-weight: bold; color: #4ade80; }
+        /* 🚀 巨大且好用的搜索框 */
+        .search-box { padding: 12px 20px; font-size: 18px; width: 400px; border-radius: 8px; border: 2px solid #4ade80; background: #2a2a3c; color: #fff; outline: none; transition: 0.3s; }
+        .search-box:focus { box-shadow: 0 0 15px rgba(74, 222, 128, 0.4); }
+        
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; margin-top: 20px; }
+        .card { background: #2a2a3c; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.3); border: 1px solid #333; }
+        .img-box { width: 100%; height: 350px; background: #111; position: relative; }
+        .img-box img { width: 100%; height: 100%; object-fit: contain; }
+        
+        .info { padding: 15px; font-size: 14px; line-height: 1.6; }
+        .filename { font-weight: bold; font-size: 18px; color: #fff; margin-top: 0; margin-bottom: 12px; border-bottom: 2px solid #4ade80; padding-bottom: 5px; }
+        
+        /* 动态生成的标签行 */
+        .tag-row { display: flex; justify-content: space-between; margin-bottom: 6px; border-bottom: 1px dashed #444; padding-bottom: 4px; }
+        .tag-key { color: #9ca3af; font-weight: bold; text-transform: uppercase; font-size: 12px; }
+        .tag-value { color: #facc15; font-weight: bold; word-break: break-all; max-width: 60%; text-align: right; }
+        
+        .loading { text-align: center; font-size: 24px; color: #facc15; margin-top: 100px; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="header">
+            <div class="stats">👕 数据库全量透视 (当前筛选出: {{ filteredItems.length }} 件)</div>
+            <input type="text" v-model="searchQuery" class="search-box" placeholder="全字段搜索 ...">
+        </div>
+
+        <div v-if="loading" class="loading">⏳ 正在疯狂拉取数据库所有数据，请不要乱动...</div>
+
+        <div class="grid" v-else>
+            <div class="card" v-for="item in filteredItems" :key="item.filename">
+                <div class="img-box">
+                    <img :src="`http://127.0.0.1:8000/images/${item.filename}`" loading="lazy">
+                </div>
+                <div class="info">
+                    <div class="filename">{{ item.filename }}</div>
+                    
+                    <div class="tag-row" v-for="(value, key) in item" :key="key">
+                        <template v-if="key !== 'filename' && key !== 'id'">
+                            <span class="tag-key">{{ key }}</span>
+                            <span class="tag-value">{{ value }}</span>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref, computed, onMounted } = Vue
+
+        createApp({
+            setup() {
+                const items = ref([])
+                const loading = ref(true)
+                const searchQuery = ref('') // 绑定搜索框的值
+
+                onMounted(async () => {
+                    try {
+                        const res = await fetch('http://127.0.0.1:8000/api/debug_all_tags')
+                        const json = await res.json()
+                        if (json.status === 'success') {
+                            items.value = json.data
+                        } else {
+                            alert("后端报错: " + json.message)
+                        }
+                    } catch (error) {
+                        alert("无法连接到后端！请检查 Python 是否运行在 8000 端口！")
+                    } finally {
+                        loading.value = false
+                    }
+                })
+
+                // 🚀 终极过滤逻辑：只要这件衣服的【任意字段】包含了搜索词，就显示它！
+                const filteredItems = computed(() => {
+                    const q = searchQuery.value.trim().toLowerCase()
+                    if (!q) return items.value // 如果搜索框是空的，显示全部！
+                    
+                    return items.value.filter(item => {
+                        // Object.values(item) 会拿到这件衣服所有的值（比如：["summer", "sporty", "波司登"...]）
+                        // .some() 只要有一个值匹配上了，这件衣服就被选出来
+                        return Object.values(item).some(val => 
+                            String(val).toLowerCase().includes(q)
+                        )
+                    })
+                })
+
+                return { items, loading, searchQuery, filteredItems }
+            }
+        }).mount('#app')
+    </script>
+</body>
+</html>
