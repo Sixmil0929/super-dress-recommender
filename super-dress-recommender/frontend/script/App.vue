@@ -1,77 +1,30 @@
 <script setup>
-import { ref } from 'vue'
-import AuthView from './AuthView.vue'
-import ProfileSetup from './ProfileSetup.vue'
-import HomeView from './HomeView.vue'
-import UploadPhotoView from './UploadPhotoView.vue'
-import StyleMatchView from './StyleMatchView.vue'
+import { useRouter } from 'vue-router'
 
-const currentPage = ref('auth')
+const router = useRouter()
 
-const handleLoginSuccess = () => {
-  currentPage.value = 'profile'
-}
-
-const handleProfileComplete = () => {
-  currentPage.value = 'home'
-}
-
-const handleUploadPhotoClicked = () => {
-  currentPage.value = 'upload'
-}
-
-const handleBackToHome = () => {
-  currentPage.value = 'home'
-}
-
-const handleGoToProfile = () => {
-  currentPage.value = 'profile'
-}
-
-const handleGoToStyleMatch = () => {
-  currentPage.value = 'style-match'
-}
-
-const handleBackFromStyleMatch = () => {
-  currentPage.value = 'home'
-}
+const handleLoginSuccess = () => router.push('/profile')
+const handleProfileComplete = () => router.push('/home')
+const handleGoToProfile = () => router.push('/profile')
+const handleGoToStyleMatch = () => router.push('/style-match')
+const handleBackToHome = () => router.push('/home')
 </script>
 
 <template>
   <div id="app-container">
-    <Transition name="page-fade" mode="out-in">
-      <AuthView
-        v-if="currentPage === 'auth'"
-        key="auth"
-        @login-success="handleLoginSuccess"
-      />
-
-      <ProfileSetup
-        v-else-if="currentPage === 'profile'"
-        key="profile"
-        @profile-complete="handleProfileComplete"
-      />
-
-      <HomeView
-        v-else-if="currentPage === 'home'"
-        key="home"
-        @go-to-style-match="handleGoToStyleMatch"
-        @go-to-profile="handleGoToProfile"
-      />
-
-      <UploadPhotoView
-        v-else-if="currentPage === 'upload'"
-        key="upload"
-        @back-to-home="handleBackToHome"
-      />
-
-      <StyleMatchView
-        v-else-if="currentPage === 'style-match'"
-        key="style-match"
-        @back-to-home="handleBackFromStyleMatch"
-      />
-
-    </Transition>
+    <RouterView v-slot="{ Component, route }">
+      <Transition name="page-fade" mode="out-in">
+        <component
+          :is="Component"
+          :key="route.fullPath"
+          @login-success="handleLoginSuccess"
+          @profile-complete="handleProfileComplete"
+          @go-to-style-match="handleGoToStyleMatch"
+          @go-to-profile="handleGoToProfile"
+          @back-to-home="handleBackToHome"
+        />
+      </Transition>
+    </RouterView>
   </div>
 </template>
 
