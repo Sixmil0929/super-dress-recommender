@@ -27,3 +27,8 @@ P5_Dataset/
 
 # 忽略 Python 虚拟环境
 .venv/
+
+# 前端 public/editorial 目录下的 JPG 资源允许纳入版本管理
+!super-dress-recommender/frontend/public/
+!super-dress-recommender/frontend/public/editorial/
+!super-dress-recommender/frontend/public/editorial/*.jpg
