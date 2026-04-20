@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(current_dir)
 
-from api import user_routes, analysis_routes
+from api import user_routes
 
 # 初始化应用
 app = FastAPI(
@@ -38,15 +38,12 @@ app.add_middleware(
 # --- 3. 路由挂载 ---
 # 注册各模块的接口路由
 app.include_router(user_routes.router, prefix="/api/user", tags=["用户管理"])
-app.include_router(analysis_routes.router, prefix="/api/analysis", tags=["AI 分析"])
 
 # --- 4. 静态资源服务 ---
 # 定位到 backend/data/uploads 目录，使前端可通过 URL 直接访问图片
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # 定位到backend/
 UPLOAD_DIR = os.path.join(BASE_DIR, "data", "uploads") # backend/data/uploads/
 os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 # --- 5. 启动入口 ---
 if __name__ == "__main__":

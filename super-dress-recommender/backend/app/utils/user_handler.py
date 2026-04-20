@@ -1,43 +1,63 @@
+import csv
 import json
 import os
+from pathlib import Path
 
-# 获取当前文件所在目录的上上上级目录作为基础路径
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-DATA_FILE = os.path.join(BASE_DIR, "data", "users.json")
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+USER_CSV = BASE_DIR / "data" / "users.csv"
+FIELDNAMES = ["phone", "password", "user_id", "created_at", "gender", "age", "height", "weight", "body_type", "style_preferences", "analysis_records"]
 
-
-def ensure_data_file():
-    """确保数据目录和文件存在"""
-    os.makedirs(os.path.dirname(DATA_FILE), exist_ok=True)
-    if not os.path.exists(DATA_FILE):
-        with open(DATA_FILE, "w", encoding="utf-8") as f:
-            json.dump([], f)
-
+def ensure_user_file():
+    USER_CSV.parent.mkdir(parents=True, exist_ok=True)
+    if not USER_CSV.exists():
+        with open(USER_CSV, "w", encoding="utf-8", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
+            writer.writeheader()
 
 def load_all_users() -> list:
-    """读取所有用户数据"""
-    ensure_data_file()
+    ensure_user_file()
+    users = []
     try:
-        with open(DATA_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except (json.JSONDecodeError, FileNotFoundError):
-        return []
+        with open(USER_CSV, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                # 强制格式化数据，增强鲁棒性
+                row["age"] = int(row["age"]) if row.get("age") else 0
+                row["height"] = float(row["height"]) if row.get("height") else 0.0
+                row["weight"] = float(row["weight"]) if row.get("weight") else 0.0
+                row["style_preferences"] = json.loads(row["style_preferences"]) if row.get("style_preferences") else []
+                row["analysis_records"] = json.loads(row["analysis_records"]) if row.get("analysis_records") else []
+                users.append(row)
+    except Exception as e:
+        print(f"Critical Error loading users: {e}")
+    return users
 
-
-def save_user_data(new_user_dict: dict):
-    """保存或更新用户数据"""
+def get_user_by_phone(phone: str):
     users = load_all_users()
+    for u in users:
+        if str(u["phone"]) == str(phone):
+            return u
+    return None
 
-    # 检查是否已存在（如果存在则更新，不存在则追加）
-    user_exists = False
-    for index, user in enumerate(users):
-        if user["user_id"] == new_user_dict["user_id"]:
-            users[index] = new_user_dict  # 更新信息
-            user_exists = True
+def save_user_data(user_dict: dict):
+    users = load_all_users()
+    
+    # 唯一性处理
+    found = False
+    for i, u in enumerate(users):
+        if str(u["phone"]) == str(user_dict["phone"]):
+            users[i] = user_dict
+            found = True
             break
+    if not found:
+        users.append(user_dict)
 
-    if not user_exists:
-        users.append(new_user_dict)
-
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(users, f, indent=4, ensure_ascii=False)
+    with open(USER_CSV, "w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
+        writer.writeheader()
+        for u in users:
+            # 序列化复杂对象
+            row_to_write = u.copy()
+            row_to_write["style_preferences"] = json.dumps(u.get("style_preferences", []), ensure_ascii=False)
+            row_to_write["analysis_records"] = json.dumps(u.get("analysis_records", []), ensure_ascii=False)
+            writer.writerow(row_to_write)
