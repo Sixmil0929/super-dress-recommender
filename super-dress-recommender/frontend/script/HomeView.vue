@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, onMounted, onUnmounted } from 'vue' 
-import axios from 'axios' 
+import api from '../src/api' 
 import Sidebar from './Sidebar.vue'
 import RecommendationList from './RecommendationList.vue'
 
@@ -12,6 +12,7 @@ const activeFilters = ref({
   style: '',
   category: ''
 })
+const tabs = ['全部', '上装', '下装', '裙装']
 
 const recommendedItems = ref([])
 const isLoading = ref(false)
@@ -29,31 +30,36 @@ const fetchLooks = async () => {
   isLoading.value = true
   
   try {
-    const res = await axios.get('http://127.0.0.1:8000/api/random_looks?limit=48')
-    
-    if (res.data.status === 'success') {
-      const newItems = res.data.data.map((item, index) => {
-        const mappedType = categoryMap[item.category] || '上装'
-        
-        return {
-          id: Date.now() + index, 
-          title: item.brand && item.brand !== 'Unknown' ? item.brand : 'V7.0 严选单品', 
-          price: item.price, 
-          category: mappedType, 
-          type: mappedType,
-          
-          // 🚀 核心修复 1：接收后端真实的英文标签，坚决不写死！
-          season: item.season, 
-          style: item.style,
-          
-          desc: '智能穿搭引擎精选',
-          image: `http://127.0.0.1:8000/images/${item.filename}`,
-          span: Math.random() > 0.8 ? 'large' : 'default' 
-        }
-      })
-      
-      recommendedItems.value.push(...newItems)
+    const res = await api.get('/api/random_looks?limit=48')
+    const payload = res.data
+    const items = Array.isArray(payload?.data) ? payload.data : []
+
+    if (payload?.status !== 'success') {
+      throw new Error(payload?.message || '首页推荐加载失败')
     }
+    
+    const newItems = items.map((item, index) => {
+      const mappedType = categoryMap[item.category] || '上装'
+      
+      return {
+        id: Date.now() + index, 
+        title: item.brand && item.brand !== 'Unknown' ? item.brand : 'V7.0 严选单品', 
+        price: item.price, 
+        category: mappedType, 
+        type: mappedType,
+        
+        // 🚀 核心修复 1：接收后端真实的英文标签，坚决不写死！
+        season: item.season, 
+        style: item.style,
+        
+        desc: '智能穿搭引擎精选',
+        image: `${api.defaults.baseURL}/images/${item.filename}`,
+        span: Math.random() > 0.8 ? 'large' : 'default' 
+      }
+    })
+    
+    recommendedItems.value.push(...newItems)
+
   } catch (error) {
     console.error("首页盲抽崩了：", error)
   } finally {

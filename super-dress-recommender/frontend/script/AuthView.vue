@@ -1,18 +1,22 @@
 <script setup>
 import { ref, reactive } from 'vue'
+import api from '../src/api'
 
 const emit = defineEmits(['login-success'])
 const isLoginMode = ref(true)
+const showLoginPassword = ref(false)
+const showRegisterPassword = ref(false)
+const showConfirmPassword = ref(false)
 
 // 登录表单数据
 const loginForm = ref({
-  username: '',
+  phone: '',
   password: ''
 })
 
 // 注册表单数据
 const registerForm = reactive({
-  username: '',
+  phone: '',
   password: '',
   confirmPassword: ''
 })
@@ -43,24 +47,35 @@ const switchMode = () => {
 }
 
 // 登录逻辑
-const handleLogin = () => {
+const handleLogin = async () => {
   clearLoginMessage()
 
-  if (!loginForm.value.username || !loginForm.value.password) {
-    loginMessage.value = '请填写账号和密码'
+  if (!loginForm.value.phone || !loginForm.value.password) {
+    loginMessage.value = '请填写手机号和密码'
     loginMessageType.value = 'error'
     return
   }
 
-  console.log('正在登录...', loginForm.value)
-  emit('login-success')
+  try {
+    console.log('正在登录...', loginForm.value)
+    const res = await api.post('/api/user/login', {
+      phone: loginForm.value.phone,
+      password: loginForm.value.password
+    })
+    
+    // 登录成功，存储手机号
+    localStorage.setItem('user_phone', loginForm.value.phone)
+    emit('login-success', res.data)
+  } catch (err) {
+    console.error('登录失败', err)
+  }
 }
 
 // 注册逻辑
-const handleRegister = () => {
+const handleRegister = async () => {
   clearRegisterMessage()
 
-  if (!registerForm.username || !registerForm.password || !registerForm.confirmPassword) {
+  if (!registerForm.phone || !registerForm.password || !registerForm.confirmPassword) {
     registerMessage.value = '请完善注册信息'
     registerMessageType.value = 'error'
     return
@@ -72,21 +87,29 @@ const handleRegister = () => {
     return
   }
 
-  console.log('正在注册...', registerForm)
+  try {
+    console.log('正在注册...', registerForm)
+    await api.post('/api/user/register', {
+      phone: registerForm.phone,
+      password: registerForm.password
+    })
 
-  registerMessage.value = '注册成功，正在跳转登录'
-  registerMessageType.value = 'success'
+    registerMessage.value = '注册成功，正在跳转登录'
+    registerMessageType.value = 'success'
 
-  // 清空注册表单
-  registerForm.username = ''
-  registerForm.password = ''
-  registerForm.confirmPassword = ''
+    // 清空注册表单
+    registerForm.phone = ''
+    registerForm.password = ''
+    registerForm.confirmPassword = ''
 
-  // 延迟切回登录页，给用户看到页面内成功提示
-  setTimeout(() => {
-    isLoginMode.value = true
-    clearRegisterMessage()
-  }, 1200)
+    // 延迟切回登录页
+    setTimeout(() => {
+      isLoginMode.value = true
+      clearRegisterMessage()
+    }, 1200)
+  } catch (err) {
+    console.error('注册失败', err)
+  }
 }
 </script>
 
@@ -121,19 +144,90 @@ const handleRegister = () => {
 
         <form v-if="isLoginMode" class="auth-form" @submit.prevent="handleLogin">
           <input
-            v-model="loginForm.username"
+            v-model="loginForm.phone"
             type="text"
-            placeholder="账号 / 用户名"
+            placeholder="手机号"
             class="auth-input"
             required
           />
-          <input
-            v-model="loginForm.password"
-            type="password"
-            placeholder="密码"
-            class="auth-input"
-            required
-          />
+          <div class="password-field">
+            <input
+              v-model="loginForm.password"
+              :type="showLoginPassword ? 'text' : 'password'"
+              placeholder="密码"
+              class="auth-input password-input"
+              required
+            />
+            <button
+              type="button"
+              class="password-toggle"
+              @click="showLoginPassword = !showLoginPassword"
+              :aria-label="showLoginPassword ? '隐藏密码' : '显示密码'"
+            >
+              <svg
+                v-if="showLoginPassword"
+                viewBox="0 0 24 24"
+                class="password-toggle-icon"
+                aria-hidden="true"
+              >
+                <path
+                  d="M3 5.5 19 21.5"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="1.7"
+                />
+                <path
+                  d="M10.58 10.7A2 2 0 0 0 13.3 13.42"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="1.7"
+                />
+                <path
+                  d="M9.88 5.12A10.94 10.94 0 0 1 12 4.9c5.05 0 8.72 3.66 9.9 6.3a1.82 1.82 0 0 1 0 1.6 12.45 12.45 0 0 1-3.36 4.28"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="1.7"
+                />
+                <path
+                  d="M6.23 7.2A12.51 12.51 0 0 0 2.1 11.2a1.82 1.82 0 0 0 0 1.6c1.18 2.64 4.85 6.3 9.9 6.3a11.4 11.4 0 0 0 3.2-.45"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="1.7"
+                />
+              </svg>
+              <svg
+                v-else
+                viewBox="0 0 24 24"
+                class="password-toggle-icon"
+                aria-hidden="true"
+              >
+                <path
+                  d="M2.1 12.8a1.82 1.82 0 0 1 0-1.6c1.18-2.64 4.85-6.3 9.9-6.3s8.72 3.66 9.9 6.3a1.82 1.82 0 0 1 0 1.6c-1.18 2.64-4.85 6.3-9.9 6.3S3.28 15.44 2.1 12.8Z"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="1.7"
+                />
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="3.1"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.7"
+                />
+              </svg>
+            </button>
+          </div>
 
           <p
             v-if="loginMessage"
@@ -148,29 +242,87 @@ const handleRegister = () => {
 
         <form v-else class="auth-form" @submit.prevent="handleRegister">
           <input
-            v-model="registerForm.username"
+            v-model="registerForm.phone"
             type="text"
-            placeholder="设置账号 / 用户名"
+            placeholder="手机号"
             class="auth-input"
             required
             @input="clearRegisterMessage"
           />
-          <input
-            v-model="registerForm.password"
-            type="password"
-            placeholder="设置密码"
-            class="auth-input"
-            required
-            @input="clearRegisterMessage"
-          />
-          <input
-            v-model="registerForm.confirmPassword"
-            type="password"
-            placeholder="确认密码"
-            class="auth-input"
-            required
-            @input="clearRegisterMessage"
-          />
+          <div class="password-field">
+            <input
+              v-model="registerForm.password"
+              :type="showRegisterPassword ? 'text' : 'password'"
+              placeholder="设置密码"
+              class="auth-input password-input"
+              required
+              @input="clearRegisterMessage"
+            />
+            <button
+              type="button"
+              class="password-toggle"
+              @click="showRegisterPassword = !showRegisterPassword"
+              :aria-label="showRegisterPassword ? '隐藏密码' : '显示密码'"
+            >
+              <svg
+                v-if="showRegisterPassword"
+                viewBox="0 0 24 24"
+                class="password-toggle-icon"
+                aria-hidden="true"
+              >
+                <path d="M3 5.5 19 21.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" />
+                <path d="M10.58 10.7A2 2 0 0 0 13.3 13.42" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" />
+                <path d="M9.88 5.12A10.94 10.94 0 0 1 12 4.9c5.05 0 8.72 3.66 9.9 6.3a1.82 1.82 0 0 1 0 1.6 12.45 12.45 0 0 1-3.36 4.28" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" />
+                <path d="M6.23 7.2A12.51 12.51 0 0 0 2.1 11.2a1.82 1.82 0 0 0 0 1.6c1.18 2.64 4.85 6.3 9.9 6.3a11.4 11.4 0 0 0 3.2-.45" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" />
+              </svg>
+              <svg
+                v-else
+                viewBox="0 0 24 24"
+                class="password-toggle-icon"
+                aria-hidden="true"
+              >
+                <path d="M2.1 12.8a1.82 1.82 0 0 1 0-1.6c1.18-2.64 4.85-6.3 9.9-6.3s8.72 3.66 9.9 6.3a1.82 1.82 0 0 1 0 1.6c-1.18 2.64-4.85 6.3-9.9 6.3S3.28 15.44 2.1 12.8Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" />
+                <circle cx="12" cy="12" r="3.1" fill="none" stroke="currentColor" stroke-width="1.7" />
+              </svg>
+            </button>
+          </div>
+          <div class="password-field">
+            <input
+              v-model="registerForm.confirmPassword"
+              :type="showConfirmPassword ? 'text' : 'password'"
+              placeholder="确认密码"
+              class="auth-input password-input"
+              required
+              @input="clearRegisterMessage"
+            />
+            <button
+              type="button"
+              class="password-toggle"
+              @click="showConfirmPassword = !showConfirmPassword"
+              :aria-label="showConfirmPassword ? '隐藏密码' : '显示密码'"
+            >
+              <svg
+                v-if="showConfirmPassword"
+                viewBox="0 0 24 24"
+                class="password-toggle-icon"
+                aria-hidden="true"
+              >
+                <path d="M3 5.5 19 21.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" />
+                <path d="M10.58 10.7A2 2 0 0 0 13.3 13.42" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" />
+                <path d="M9.88 5.12A10.94 10.94 0 0 1 12 4.9c5.05 0 8.72 3.66 9.9 6.3a1.82 1.82 0 0 1 0 1.6 12.45 12.45 0 0 1-3.36 4.28" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" />
+                <path d="M6.23 7.2A12.51 12.51 0 0 0 2.1 11.2a1.82 1.82 0 0 0 0 1.6c1.18 2.64 4.85 6.3 9.9 6.3a11.4 11.4 0 0 0 3.2-.45" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" />
+              </svg>
+              <svg
+                v-else
+                viewBox="0 0 24 24"
+                class="password-toggle-icon"
+                aria-hidden="true"
+              >
+                <path d="M2.1 12.8a1.82 1.82 0 0 1 0-1.6c1.18-2.64 4.85-6.3 9.9-6.3s8.72 3.66 9.9 6.3a1.82 1.82 0 0 1 0 1.6c-1.18 2.64-4.85 6.3-9.9 6.3S3.28 15.44 2.1 12.8Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" />
+                <circle cx="12" cy="12" r="3.1" fill="none" stroke="currentColor" stroke-width="1.7" />
+              </svg>
+            </button>
+          </div>
 
           <p
             v-if="registerMessage"
@@ -303,14 +455,57 @@ const handleRegister = () => {
 }
 
 .auth-input {
+  width: 100%;
   height: 56px;
   padding: 0 18px;
+  box-sizing: border-box;
   border-radius: 14px;
   border: 1px solid #ded8cf;
   background: rgba(255, 255, 255, 0.9);
   font-size: 15px;
   outline: none;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.auth-input::-ms-reveal,
+.auth-input::-ms-clear {
+  display: none;
+}
+
+.password-field {
+  position: relative;
+  width: 100%;
+}
+
+.password-input {
+  padding-right: 72px;
+}
+
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  color: #9e917f;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+
+.password-toggle:hover {
+  color: #1f1f1f;
+  background: rgba(31, 31, 31, 0.05);
+}
+
+.password-toggle-icon {
+  width: 18px;
+  height: 18px;
 }
 
 .auth-input:focus {

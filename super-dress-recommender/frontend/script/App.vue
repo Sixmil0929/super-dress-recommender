@@ -3,7 +3,13 @@ import { useRouter } from 'vue-router'
 
 const router = useRouter()
 
-const handleLoginSuccess = () => router.push('/profile')
+const handleLoginSuccess = (payload) => {
+  if (payload?.is_profile_completed) {
+    router.push('/home')
+    return
+  }
+  router.push('/profile')
+}
 const handleProfileComplete = () => router.push('/home')
 const handleGoToProfile = () => router.push('/profile')
 const handleGoToStyleMatch = () => router.push('/style-match')

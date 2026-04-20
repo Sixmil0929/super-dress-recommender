@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue'
+import api from '../src/api'
 
 const genderOptions = [
   { zh: '男生', en: 'male', value: 'male' },
@@ -88,71 +89,65 @@ const generateLooks = async () => {
 
   try {
     const payload = {
-      // 🚀 核心改动 3：解开硬编码的封印！读取用户的真实选择
       gender: selected.value.gender || "", 
       season: selected.value.season || "",
       scene: selected.value.scene || "",
-      style: selected.value.style,  // 本来就是数组了，直接传
-      preferred_colors: selected.value.color // 本来就是数组了，直接传
+      style: selected.value.style,  
+      preferred_colors: selected.value.color 
     };
 
     console.log("📤 发送给后端的数据:", payload);
 
-    const response = await fetch('http://127.0.0.1:8000/api/recommend_by_survey', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
+    const res = await api.post('/api/recommend_by_survey', payload)
+    const responseData = res.data
 
-    const result = await response.json();
-
-    if (result.status === 'success') {
-      console.log("🔥 拿到后端真实数据了！", result.data.outfits);
-      
-      const formattedLooks = result.data.outfits.map((outfit, index) => {
-        if (outfit.type === 'single' || outfit.type === 'one_piece') {
-          return {
-            id: index + 1,
-            type: 'dress', 
-            items: [{ 
-              category: outfit.item.category || '推荐单品', 
-              brand: outfit.item.brand || '未知品牌', 
-              price: outfit.item.price || '¥299',
-              image: `http://127.0.0.1:8000/images/${outfit.item.filename}` 
-            }]
-          }
-        } 
-        else if (outfit.type === 'combo') {
-          return {
-            id: index + 1,
-            type: 'separate',
-            items: [
-              { 
-                category: '上衣', 
-                brand: outfit.top.brand || '未知品牌', 
-                price: outfit.top.price || '¥199', 
-                image: `http://127.0.0.1:8000/images/${outfit.top.filename}` 
-              },
-              { 
-                category: '下装', 
-                brand: outfit.bottom.brand || '未知品牌', 
-                price: outfit.bottom.price || '¥259', 
-                image: `http://127.0.0.1:8000/images/${outfit.bottom.filename}` 
-              }
-            ]
-          }
-        }
-      });
-
-      resultLooks.value = formattedLooks;
-    } else {
-      console.error("后端报错了：", result.message);
-      alert("后端报错啦，去 Python 终端看一眼！");
+    if (responseData?.status !== 'success') {
+      throw new Error(responseData?.message || '推荐失败')
     }
 
+    const outfits = responseData?.data?.outfits || []
+
+    console.log("🔥 拿到后端真实数据了！", outfits);
+    
+    const formattedLooks = outfits.map((outfit, index) => {
+      if (outfit.type === 'single' || outfit.type === 'one_piece') {
+        return {
+          id: index + 1,
+          type: 'dress', 
+          items: [{ 
+            category: outfit.item.category || '推荐单品', 
+            brand: outfit.item.brand || '未知品牌', 
+            price: outfit.item.price || '¥299',
+            image: `${api.defaults.baseURL}/images/${outfit.item.filename}` 
+          }]
+        }
+      } 
+      else if (outfit.type === 'combo') {
+        return {
+          id: index + 1,
+          type: 'separate',
+          items: [
+            { 
+              category: '上衣', 
+              brand: outfit.top.brand || '未知品牌', 
+              price: outfit.top.price || '¥199', 
+              image: `${api.defaults.baseURL}/images/${outfit.top.filename}` 
+            },
+            { 
+              category: '下装', 
+              brand: outfit.bottom.brand || '未知品牌', 
+              price: outfit.bottom.price || '¥259', 
+              image: `${api.defaults.baseURL}/images/${outfit.bottom.filename}` 
+            }
+          ]
+        }
+      }
+    });
+
+    resultLooks.value = formattedLooks;
+
   } catch (error) {
-    console.error("请求失败！Python 服务器没开？或者跨域没配？", error);
-    alert("连不上后端，请检查你的 api_server.py 是否在运行！");
+    console.error("请求失败！", error);
   } finally {
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
