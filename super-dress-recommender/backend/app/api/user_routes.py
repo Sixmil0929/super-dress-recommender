@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from models.user_model import UserAuthRequest, UserProfileUpdate
+from schemas.user_model import UserAuthRequest, UserProfileUpdate
 from utils.user_handler import get_user_by_phone, save_user_data
 from datetime import datetime
 import uuid
