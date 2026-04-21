@@ -1,5 +1,6 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, onMounted } from 'vue'
+import api from '../src/api'
 
 const emit = defineEmits(['profile-complete'])
 
@@ -20,22 +21,54 @@ const styleOptions = [
   '街头'
 ]
 
-const savedProfile = localStorage.getItem('dress-select-profile')
+const createDefaultProfile = () => ({
+  gender: '',
+  age: null,
+  height: null,
+  weight: null,
+  body_type: '',
+  style: []
+})
 
-const userProfile = ref(
-  savedProfile
-    ? JSON.parse(savedProfile)
-    : {
-        gender: '',
-        age: null,
-        height: null,
-        weight: null,
-        bodyType: '',
-        stylePreferences: []
-      }
-)
+const normalizeProfile = (rawProfile) => {
+  if (!rawProfile || typeof rawProfile !== 'object') {
+    return createDefaultProfile()
+  }
+
+  return {
+    gender: rawProfile.gender || '',
+    age: rawProfile.age ?? null,
+    height: rawProfile.height ?? null,
+    weight: rawProfile.weight ?? null,
+    body_type: rawProfile.body_type || rawProfile.bodyType || '',
+    style: Array.isArray(rawProfile.style)
+      ? rawProfile.style
+      : Array.isArray(rawProfile.stylePreferences)
+        ? rawProfile.stylePreferences
+        : []
+  }
+}
+
+const savedProfile = localStorage.getItem('dress-select-profile')
+let initialProfile = createDefaultProfile()
+
+if (savedProfile) {
+  try {
+    initialProfile = normalizeProfile(JSON.parse(savedProfile))
+  } catch (error) {
+    console.warn('本地资料缓存已损坏，已回退到默认值', error)
+  }
+}
+
+const userProfile = ref(initialProfile)
 
 const errorMessage = ref('')
+const currentUserPhone = ref('')
+
+onMounted(() => {
+  currentUserPhone.value = localStorage.getItem('user_phone') || ''
+})
+
 watch(
   userProfile,
   (newValue) => {
@@ -44,7 +77,7 @@ watch(
   { deep: true }
 )
 
-const submitProfile = () => {
+const submitProfile = async () => {
   if (
     !userProfile.value.gender ||
     !userProfile.value.age ||
@@ -55,16 +88,37 @@ const submitProfile = () => {
     return
   }
 
-  errorMessage.value = ''
-  emit('profile-complete')
+  if (!currentUserPhone.value) {
+    errorMessage.value = '未找到用户信息，请重新登录'
+    return
+  }
+
+  try {
+    errorMessage.value = ''
+    console.log('正在提交资料...', userProfile.value)
+    
+    await api.post('/api/user/profile', {
+      phone: currentUserPhone.value,
+      gender: userProfile.value.gender,
+      age: parseInt(userProfile.value.age),
+      height: parseFloat(userProfile.value.height),
+      weight: parseFloat(userProfile.value.weight),
+      body_type: userProfile.value.body_type,
+      style: userProfile.value.style
+    })
+
+    emit('profile-complete')
+  } catch (err) {
+    console.error('资料提交失败', err)
+  }
 }
 
 const toggleStyle = (style) => {
-  const index = userProfile.value.stylePreferences.indexOf(style)
+  const index = userProfile.value.style.indexOf(style)
   if (index === -1) {
-    userProfile.value.stylePreferences.push(style)
+    userProfile.value.style.push(style)
   } else {
-    userProfile.value.stylePreferences.splice(index, 1)
+    userProfile.value.style.splice(index, 1)
   }
 }
 </script>
@@ -128,7 +182,7 @@ const toggleStyle = (style) => {
 
         <div class="form-group">
           <label>主要体型</label>
-          <select v-model="userProfile.bodyType">
+          <select v-model="userProfile.body_type">
             <option disabled value="">请选择</option>
             <option v-for="type in bodyTypes" :key="type" :value="type">
               {{ type }}
@@ -144,7 +198,7 @@ const toggleStyle = (style) => {
               v-for="style in styleOptions"
               :key="style"
               class="style-tag"
-              :class="{ selected: userProfile.stylePreferences.includes(style) }"
+              :class="{ selected: userProfile.style.includes(style) }"
               @click="toggleStyle(style)"
             >
               {{ style }}

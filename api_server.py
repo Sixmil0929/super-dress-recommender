@@ -518,6 +518,8 @@
 
 import os
 import json
+import os
+import sys
 import torch
 import psycopg2
 import numpy as np
@@ -529,14 +531,22 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import List, Optional
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BACKEND_APP_DIR = os.path.join(BASE_DIR, "super-dress-recommender", "backend", "app")
+if BACKEND_APP_DIR not in sys.path:
+    sys.path.append(BACKEND_APP_DIR)
+
+from api import user_routes
+
 app = FastAPI(title="V8.0 漏斗架构：SQL硬召回 + 审美排序")
 
 # ==========================================
 # 1. 跨域防护与静态资源
 # ==========================================
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
-IMG_DIR = r"D:\dress_recommender\images\images"
+IMG_DIR = os.path.join(BASE_DIR, "images")
 app.mount("/images", StaticFiles(directory=IMG_DIR), name="images")
+app.include_router(user_routes.router, prefix="/api/user", tags=["用户管理"])
 
 # ==========================================
 # 2. 核心辅助工具
