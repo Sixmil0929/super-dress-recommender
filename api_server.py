@@ -815,7 +815,7 @@ def get_all_tags():
         return {"status": "error", "message": str(e)}
 
 # 用户行为录入接口：前端每次用户对某件衣服的点击、停留、喜欢、收藏、分享等行为，都调用这个接口记录下来
-@app.post("/api/behavior/record")
+@app.post("/api/behavior/record", tags=["用户交互统计接口"])
 async def record_user_behavior(req: UserBehaviorRequest):
     print(f"📡 收到行为数据：用户 {req.user_phone} 对 {req.filename} 停留 {req.stay_duration}s")
     try:
@@ -859,7 +859,7 @@ async def record_user_behavior(req: UserBehaviorRequest):
         return {"status": "error", "message": str(e)}
 
 # 单件衣服统计信息获取接口
-@app.get("/api/item/stats/{filename}")
+@app.get("/api/item/stats/{filename}", tags=["服装信息统计接口"])
 async def get_item_stats(filename: str):
     try:
         conn = psycopg2.connect(host="localhost", database="postgres", user="postgres", password="123456", port="5432")
