@@ -593,6 +593,16 @@ class QuestionnaireRequest(BaseModel):
     style: Optional[List[str]] = []
     preferred_colors: Optional[List[str]] = []
 
+# 用户行为数据模型
+class UserBehaviorRequest(BaseModel):
+    user_phone: str # 用户手机号（唯一标识）
+    filename: str # 用户点击的衣服图片文件名
+    stay_duration: int = 0 # 用户在该图片上的停留时间，单位秒
+    is_like: bool = False 
+    is_collect: bool = False 
+    is_share: bool = False 
+
+
 # ==========================================
 # 3. 核心 API：漏斗架构推荐
 # ==========================================
@@ -803,6 +813,82 @@ def get_all_tags():
     except Exception as e:
         print(f"💥 查水表崩溃: {e}")
         return {"status": "error", "message": str(e)}
+
+# 用户行为录入接口：前端每次用户对某件衣服的点击、停留、喜欢、收藏、分享等行为，都调用这个接口记录下来
+@app.post("/api/behavior/record")
+async def record_user_behavior(req: UserBehaviorRequest):
+    print(f"📡 收到行为数据：用户 {req.user_phone} 对 {req.filename} 停留 {req.stay_duration}s")
+    try:
+        conn = psycopg2.connect(host="localhost", database="postgres", user="postgres", password="123456", port="5432")
+        cursor = conn.cursor()
+
+        # A. 写入明细表 (user_item_behavior)
+        insert_detail_query = """
+            INSERT INTO user_item_behavior (user_phone, filename, stay_duration, is_like, is_collect, is_share)
+            VALUES (%s, %s, %s, %s, %s, %s);
+        """
+        cursor.execute(insert_detail_query, (req.user_phone, req.filename, req.stay_duration, req.is_like, req.is_collect, req.is_share))
+
+        # B. 更新全局统计表 (item_engagement_stats)
+        # 使用 UPSERT：如果不存在则插入新行，存在则累加数值
+        upsert_stats_query = """
+            INSERT INTO item_engagement_stats (filename, total_likes, total_collects, total_shares, total_views, total_stay_time)
+            VALUES (%s, %s, %s, %s, 1, %s)
+            ON CONFLICT (filename) DO UPDATE SET
+                total_likes = item_engagement_stats.total_likes + EXCLUDED.total_likes,
+                total_collects = item_engagement_stats.total_collects + EXCLUDED.total_collects,
+                total_shares = item_engagement_stats.total_shares + EXCLUDED.total_shares,
+                total_views = item_engagement_stats.total_views + 1,
+                total_stay_time = item_engagement_stats.total_stay_time + EXCLUDED.total_stay_time,
+                updated_at = CURRENT_TIMESTAMP;
+        """
+        cursor.execute(upsert_stats_query, (
+            req.filename, 
+            1 if req.is_like else 0, 
+            1 if req.is_collect else 0, 
+            1 if req.is_share else 0, 
+            req.stay_duration
+        ))
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return {"status": "success", "message": "行为数据已入库并汇总"}
+    except Exception as e:
+        print(f"💥 行为录入失败: {e}")
+        return {"status": "error", "message": str(e)}
+
+# 单件衣服统计信息获取接口
+@app.get("/api/item/stats/{filename}")
+async def get_item_stats(filename: str):
+    try:
+        conn = psycopg2.connect(host="localhost", database="postgres", user="postgres", password="123456", port="5432")
+        cursor = conn.cursor()
+        
+        sql = "SELECT total_likes, total_collects, total_shares, total_views, total_stay_time FROM item_engagement_stats WHERE filename = %s;"
+        cursor.execute(sql, (filename,))
+        row = cursor.fetchone()
+        
+        cursor.close()
+        conn.close()
+
+        if row:
+            return {
+                "status": "success",
+                "data": {
+                    "total_likes": row[0],
+                    "total_collects": row[1],
+                    "total_shares": row[2],
+                    "total_views": row[3],
+                    "total_stay_time": row[4]
+                }
+            }
+        # 如果没记录，返回全 0
+        return {"status": "success", "data": {"total_likes": 0, "total_collects": 0, "total_shares": 0, "total_views": 0, "total_stay_time": 0}}
+            
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 
 if __name__ == "__main__":
     import uvicorn
