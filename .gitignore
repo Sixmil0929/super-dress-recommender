@@ -32,3 +32,6 @@ P5_Dataset/
 !super-dress-recommender/frontend/public/
 !super-dress-recommender/frontend/public/editorial/
 !super-dress-recommender/frontend/public/editorial/*.jpg
+
+# 忽略vscode文件夹下的个人设置
+.vscode/*
