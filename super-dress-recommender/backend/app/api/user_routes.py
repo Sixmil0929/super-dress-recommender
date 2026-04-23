@@ -28,8 +28,7 @@ async def register(auth: UserAuthRequest):
         "height": 0.0,
         "weight": 0.0,
         "body_type": "",
-        "style_preferences": [],
-        "analysis_records": []
+        "style_preferences": []
     }
     
     try:

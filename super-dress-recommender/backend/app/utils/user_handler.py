@@ -1,63 +1,92 @@
-import csv
+import psycopg2
+from psycopg2.extras import RealDictCursor
 import json
-import os
-from pathlib import Path
+import uuid
 
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
-USER_CSV = BASE_DIR / "data" / "users.csv"
-FIELDNAMES = ["phone", "password", "user_id", "created_at", "gender", "age", "height", "weight", "body_type", "style_preferences", "analysis_records"]
+# 统一数据库配置
+DB_CONFIG = {
+    'host': 'localhost',
+    'user': 'postgres',
+    'password': '123456',
+    'database': 'postgres',
+    'port': 5432
+}
 
-def ensure_user_file():
-    USER_CSV.parent.mkdir(parents=True, exist_ok=True)
-    if not USER_CSV.exists():
-        with open(USER_CSV, "w", encoding="utf-8", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
-            writer.writeheader()
-
-def load_all_users() -> list:
-    ensure_user_file()
-    users = []
-    try:
-        with open(USER_CSV, "r", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                # 强制格式化数据，增强鲁棒性
-                row["age"] = int(row["age"]) if row.get("age") else 0
-                row["height"] = float(row["height"]) if row.get("height") else 0.0
-                row["weight"] = float(row["weight"]) if row.get("weight") else 0.0
-                row["style_preferences"] = json.loads(row["style_preferences"]) if row.get("style_preferences") else []
-                row["analysis_records"] = json.loads(row["analysis_records"]) if row.get("analysis_records") else []
-                users.append(row)
-    except Exception as e:
-        print(f"Critical Error loading users: {e}")
-    return users
+def get_db_connection():
+    # RealDictCursor 会让查询结果直接变成字典，这样前端拿到的 JSON 结构就不会变
+    return psycopg2.connect(**DB_CONFIG, cursor_factory=RealDictCursor)
 
 def get_user_by_phone(phone: str):
-    users = load_all_users()
-    for u in users:
-        if str(u["phone"]) == str(phone):
-            return u
-    return None
+    """根据手机号获取用户。返回值格式必须与之前一致"""
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT * FROM users WHERE phone = %s", (phone,))
+        user = cur.fetchone()
+        if user:
+            # 这里的 user 已经是一个字典了，RealDictCursor 的功劳
+            return dict(user) 
+        return None
+    finally:
+        cur.close()
+        conn.close()
 
 def save_user_data(user_dict: dict):
-    users = load_all_users()
+    conn = get_db_connection()
+    cur = conn.cursor()
     
-    # 唯一性处理
-    found = False
-    for i, u in enumerate(users):
-        if str(u["phone"]) == str(user_dict["phone"]):
-            users[i] = user_dict
-            found = True
-            break
-    if not found:
-        users.append(user_dict)
+    # 1. 准备复杂字段
+    style_prefs = json.dumps(user_dict.get("style_preferences", []), ensure_ascii=False)
+    
+    # 2. 确保 UUID 是字符串格式
+    u_id = user_dict.get("user_id")
+    if not u_id:
+        u_id = str(uuid.uuid4())
+    else:
+        u_id = str(u_id)
 
-    with open(USER_CSV, "w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
-        writer.writeheader()
-        for u in users:
-            # 序列化复杂对象
-            row_to_write = u.copy()
-            row_to_write["style_preferences"] = json.dumps(u.get("style_preferences", []), ensure_ascii=False)
-            row_to_write["analysis_records"] = json.dumps(u.get("analysis_records", []), ensure_ascii=False)
-            writer.writerow(row_to_write)
+    # 3. 构造数据字典 (键名对应 SQL 中的 %(key)s)
+    # 注意：这里不包含 created_at，让数据库自动处理
+    data_to_save = {
+        "phone": user_dict['phone'],
+        "password": user_dict['password'],
+        "user_id": u_id,
+        "gender": user_dict.get('gender'),
+        "age": user_dict.get('age', 0),
+        "height": user_dict.get('height', 0.0),
+        "weight": user_dict.get('weight', 0.0),
+        "body_type": user_dict.get('body_type', ''),
+        "style": style_prefs
+    }
+
+    # 4. 🌟 使用命名占位符 (更鲁棒，不会报 index out of range)
+    sql = """
+    INSERT INTO users (
+        phone, password, user_id, gender, 
+        age, height, weight, body_type, style_preferences
+    )
+    VALUES (
+        %(phone)s, %(password)s, %(user_id)s, %(gender)s, 
+        %(age)s, %(height)s, %(weight)s, %(body_type)s, %(style)s
+    )
+    ON CONFLICT (phone) DO UPDATE SET
+        password = EXCLUDED.password,
+        gender = EXCLUDED.gender,
+        age = EXCLUDED.age,
+        height = EXCLUDED.height,
+        weight = EXCLUDED.weight,
+        body_type = EXCLUDED.body_type,
+        style_preferences = EXCLUDED.style_preferences;
+    """
+    
+    try:
+        # 传入字典而不是元组，psycopg2 会自动匹配键名
+        cur.execute(sql, data_to_save)
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        print(f"PostgreSQL Error: {e}")
+        raise e
+    finally:
+        cur.close()
+        conn.close()

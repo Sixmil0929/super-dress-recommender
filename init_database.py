@@ -13,7 +13,7 @@ import sys
 DB_CONFIG = {
     'host': 'localhost',
     'user': 'postgres',
-    'password': 'postgres',  # 根据你的PostgreSQL密码修改
+    'password': '123456',  # 根据你的PostgreSQL密码修改
     'port': 5432
 }
 
