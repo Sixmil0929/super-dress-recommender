@@ -586,6 +586,42 @@ def apply_mmr(items, top_n=15, diversity_weight=0.5):
         
     return selected_items
 
+
+def ensure_behavior_tables(cursor):
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS user_item_behavior (
+            id SERIAL PRIMARY KEY,
+            user_phone TEXT NOT NULL,
+            filename TEXT NOT NULL,
+            stay_duration INTEGER NOT NULL DEFAULT 0,
+            is_like BOOLEAN NOT NULL DEFAULT FALSE,
+            is_collect BOOLEAN NOT NULL DEFAULT FALSE,
+            is_share BOOLEAN NOT NULL DEFAULT FALSE,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        """
+    )
+    cursor.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_user_item_behavior_phone_filename
+        ON user_item_behavior (user_phone, filename, created_at DESC);
+        """
+    )
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS item_engagement_stats (
+            filename TEXT PRIMARY KEY,
+            total_likes INTEGER NOT NULL DEFAULT 0,
+            total_collects INTEGER NOT NULL DEFAULT 0,
+            total_shares INTEGER NOT NULL DEFAULT 0,
+            total_views INTEGER NOT NULL DEFAULT 0,
+            total_stay_time INTEGER NOT NULL DEFAULT 0,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        """
+    )
+
 class QuestionnaireRequest(BaseModel):
     gender: Optional[str] = ""
     season: Optional[str] = ""
@@ -757,7 +793,7 @@ def get_random_looks(limit: int = 12):
         conn = psycopg2.connect(host="localhost", database="postgres", user="postgres", password="123456", port="5432")
         cursor = conn.cursor()
         
-        sql_query = "SELECT filename, item_category, color, brand, price, season, style FROM clothing_features ORDER BY RANDOM() LIMIT %s;"
+        sql_query = "SELECT filename, item_category, color, brand, price, season, style, gender FROM clothing_features ORDER BY RANDOM() LIMIT %s;"
         cursor.execute(sql_query, (limit,))
         rows = cursor.fetchall()
         
@@ -767,12 +803,50 @@ def get_random_looks(limit: int = 12):
             "color": row[2], 
             "brand": row[3], 
             "price": f"¥{int(row[4])}" if row[4] else "¥199",
-            "season": row[5] or "",  # 新增季节
-            "style": row[6] or ""    # 新增风格
+            "season": row[5] or "",
+            "style": row[6] or "",
+            "gender": row[7] or ""
         } for row in rows]
         
         cursor.close(); conn.close()
         return {"status": "success", "data": random_items}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.get("/api/item/detail/{filename}")
+def get_item_detail(filename: str):
+    try:
+        conn = psycopg2.connect(host="localhost", database="postgres", user="postgres", password="123456", port="5432")
+        cursor = conn.cursor()
+
+        sql_query = """
+            SELECT filename, item_category, color, brand, price, season, style, gender
+            FROM clothing_features
+            WHERE filename = %s
+            LIMIT 1;
+        """
+        cursor.execute(sql_query, (filename,))
+        row = cursor.fetchone()
+
+        cursor.close()
+        conn.close()
+
+        if not row:
+            return {"status": "error", "message": "未找到对应衣服详情"}
+
+        return {
+            "status": "success",
+            "data": {
+                "filename": str(row[0]).strip(),
+                "category": row[1] or "",
+                "color": row[2] or "",
+                "brand": row[3] or "",
+                "price": f"¥{int(row[4])}" if row[4] else "¥199",
+                "season": row[5] or "",
+                "style": row[6] or "",
+                "gender": row[7] or ""
+            }
+        }
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
@@ -821,6 +895,7 @@ async def record_user_behavior(req: UserBehaviorRequest):
     try:
         conn = psycopg2.connect(host="localhost", database="postgres", user="postgres", password="123456", port="5432")
         cursor = conn.cursor()
+        ensure_behavior_tables(cursor)
 
         # 先取该用户对该衣服的最新状态，用于计算差量（支持取消点赞/收藏）
         last_state_query = """
@@ -853,7 +928,7 @@ async def record_user_behavior(req: UserBehaviorRequest):
         # 使用 UPSERT：如果不存在则插入新行，存在则按差量更新，支持取消行为
         upsert_stats_query = """
             INSERT INTO item_engagement_stats (filename, total_likes, total_collects, total_shares, total_views, total_stay_time)
-            VALUES (%s, %s, %s, %s, 1, %s)
+            VALUES (%s, %s, %s, %s, %s, %s)
             ON CONFLICT (filename) DO UPDATE SET
                 total_likes = GREATEST(0, item_engagement_stats.total_likes + EXCLUDED.total_likes),
                 total_collects = GREATEST(0, item_engagement_stats.total_collects + EXCLUDED.total_collects),
@@ -894,6 +969,7 @@ async def get_item_stats(filename: str):
     try:
         conn = psycopg2.connect(host="localhost", database="postgres", user="postgres", password="123456", port="5432")
         cursor = conn.cursor()
+        ensure_behavior_tables(cursor)
         
         sql = "SELECT total_likes, total_collects, total_shares, total_views, total_stay_time FROM item_engagement_stats WHERE filename = %s;"
         cursor.execute(sql, (filename,))

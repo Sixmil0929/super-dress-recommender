@@ -1,4 +1,6 @@
 <script setup>
+const emit = defineEmits(['open-detail'])
+
 const props = defineProps({
   items: {
     type: Array,
@@ -6,6 +8,24 @@ const props = defineProps({
     default: () => []
   }
 })
+
+const emitOpenDetail = (item, event) => {
+  const trigger = event?.currentTarget
+  const imageEl = trigger?.querySelector('.item-main-img')
+  const rect = imageEl?.getBoundingClientRect?.()
+
+  emit('open-detail', {
+    item,
+    imageRect: rect
+      ? {
+          top: rect.top,
+          left: rect.left,
+          width: rect.width,
+          height: rect.height
+        }
+      : null
+  })
+}
 </script>
 
 <template>
@@ -16,6 +36,11 @@ const props = defineProps({
         :key="item.id"
         class="product-card"
         :class="{ 'card-large': item.span === 'large' }"
+        role="button"
+        tabindex="0"
+        @click="emitOpenDetail(item, $event)"
+        @keydown.enter.prevent="emitOpenDetail(item, $event)"
+        @keydown.space.prevent="emitOpenDetail(item, $event)"
       >
         <div class="card-image">
           <span class="image-tag">LOOK</span>
@@ -23,12 +48,10 @@ const props = defineProps({
         </div>
 
         <div class="card-body">
-          <p class="card-category">{{ item.category }}</p>
           <h3 class="card-title">{{ item.title }}</h3>
           <p class="card-desc">{{ item.desc }}</p>
           <div class="card-footer">
             <p class="card-price">{{ item.price }}</p>
-            <button class="detail-btn">查看详情</button>
           </div>
         </div>
       </article>
@@ -55,11 +78,17 @@ const props = defineProps({
   border: 1px solid #ece7df;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+  cursor: pointer;
+  outline: none;
 }
 
 .product-card:hover {
   transform: translateY(-4px);
   box-shadow: 0 14px 28px rgba(0, 0, 0, 0.08);
+}
+
+.product-card:focus-visible {
+  box-shadow: 0 0 0 3px rgba(122, 65, 52, 0.18), 0 14px 28px rgba(0, 0, 0, 0.08);
 }
 
 .card-large {
@@ -139,16 +168,8 @@ const props = defineProps({
   padding: 16px 18px 18px;
 }
 
-.card-category {
-  margin: 0 0 8px;
-  color: #8b7355;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.6px;
-}
-
 .card-title {
-  margin: 0 0 8px;
+  margin: 0 0 10px;
   font-size: 20px;
   color: #1f1f1f;
 }
@@ -172,23 +193,6 @@ const props = defineProps({
   font-size: 24px;
   font-weight: 700;
   color: #7a4134;
-}
-
-.detail-btn {
-  height: 36px;
-  padding: 0 14px;
-  border: 1px solid #ddd6ca;
-  border-radius: 999px;
-  background: #fcfbf9;
-  cursor: pointer;
-  color: #4a433b;
-  font-size: 13px;
-  transition: all 0.2s ease;
-}
-
-.detail-btn:hover {
-  background: #f2ede7;
-  border-color: #cfc5b7;
 }
 
 @media (max-width: 1100px) {

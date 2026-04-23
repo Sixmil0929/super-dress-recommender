@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import api from '../src/api'
 
 const genderOptions = [
@@ -69,6 +69,21 @@ const resultLooks = ref([])
 const showResults = ref(false)
 const resultVersion = ref(0)
 const hasGenerated = ref(false)
+const selectedItem = ref(null)
+const detailMeta = ref(createEmptyDetailMeta())
+const detailStats = ref(createEmptyStats())
+const detailBehavior = ref(createEmptyBehavior())
+const detailOpenedAt = ref(0)
+const userPhone = ref('')
+const behaviorStateMap = ref({})
+const isDetailLoading = ref(false)
+const detailMediaFrameRef = ref(null)
+const detailImageRef = ref(null)
+const detailInfoVisible = ref(false)
+const detailImageVisible = ref(true)
+const motionImage = ref(null)
+let motionTimer = null
+const BEHAVIOR_STORAGE_KEY = 'dress-select-item-behavior'
 
 // 🚀 核心改动 2：多选切换逻辑 (被 @click="toggleMulti('style', item.value)" 调用)
 // ⚠️ 注意：你需要去你的 <template> 里，把 style 和 color 的点击事件改成调用这个函数！
@@ -81,6 +96,149 @@ const toggleMulti = (category, value) => {
     selected.value[category].push(value); // 不在就加入
   }
 }
+
+const seasonLabelMap = {
+  spring: '春季',
+  summer: '夏季',
+  autumn: '秋季',
+  fall: '秋季',
+  winter: '冬季'
+}
+
+const styleLabelMap = {
+  sporty: '运动风',
+  streetwear: '街头风',
+  minimalist: '极简风',
+  casual: '休闲风',
+  formal: '正式风',
+  business: '商务风',
+  outdoor: '户外风',
+  vintage: '复古风',
+  elegant: '优雅风',
+  romantic: '浪漫风',
+  sweet: '甜美风',
+  sexy: '性感风',
+  'business casual': '轻商务',
+  'romantic dating': '约会风'
+}
+
+const genderLabelMap = {
+  male: '男装',
+  female: '女装',
+  unisex: '中性'
+}
+
+function createEmptyStats() {
+  return {
+    total_likes: 0,
+    total_collects: 0,
+    total_shares: 0,
+    total_views: 0,
+    total_stay_time: 0
+  }
+}
+
+function createEmptyBehavior() {
+  return {
+    is_like: false,
+    is_collect: false,
+    is_share: false
+  }
+}
+
+function createEmptyDetailMeta() {
+  return {
+    filename: '',
+    category: '',
+    color: '',
+    brand: '',
+    price: '',
+    season: '',
+    style: '',
+    gender: ''
+  }
+}
+
+const cloneRect = (rect) =>
+  rect
+    ? {
+        top: rect.top,
+        left: rect.left,
+        width: rect.width,
+        height: rect.height
+      }
+    : null
+
+const parseBehaviorStorage = () => {
+  try {
+    const raw = localStorage.getItem(BEHAVIOR_STORAGE_KEY)
+    return raw ? JSON.parse(raw) : {}
+  } catch (error) {
+    console.warn('读取本地行为缓存失败：', error)
+    return {}
+  }
+}
+
+const persistBehaviorStorage = () => {
+  localStorage.setItem(BEHAVIOR_STORAGE_KEY, JSON.stringify(behaviorStateMap.value))
+}
+
+const getCurrentUserPhone = () => userPhone.value || localStorage.getItem('user_phone') || 'guest'
+const getBehaviorCacheKey = (filename) => `${getCurrentUserPhone()}::${filename}`
+
+const getCachedBehavior = (filename) => {
+  const state = behaviorStateMap.value[getBehaviorCacheKey(filename)]
+  return state ? { ...createEmptyBehavior(), ...state } : createEmptyBehavior()
+}
+
+const setCachedBehavior = (filename, state) => {
+  behaviorStateMap.value = {
+    ...behaviorStateMap.value,
+    [getBehaviorCacheKey(filename)]: { ...state }
+  }
+  persistBehaviorStorage()
+}
+
+const normalizeChineseList = (value, dictionary, fallback) => {
+  if (!value) return fallback
+
+  const tokens = String(value)
+    .split(',')
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean)
+
+  if (tokens.length === 0) return fallback
+
+  return tokens
+    .map((token) => dictionary[token] || token)
+    .join('、')
+}
+
+const normalizeGenderLabel = (value) => {
+  if (!value) return ''
+  return genderLabelMap[String(value).trim().toLowerCase()] || String(value)
+}
+
+const detailSummary = computed(() => {
+  if (!selectedItem.value) return ''
+
+  const season = normalizeChineseList(detailMeta.value.season, seasonLabelMap, '多季节')
+  const style = normalizeChineseList(detailMeta.value.style, styleLabelMap, '简约风')
+  return `适合 ${season} 穿着，整体更偏 ${style}，适合作为日常搭配中的主视觉单品。`
+})
+
+const motionImageStyle = computed(() => {
+  if (!motionImage.value) return {}
+
+  const rect = motionImage.value.atEnd ? motionImage.value.end : motionImage.value.start
+  return {
+    top: `${rect.top}px`,
+    left: `${rect.left}px`,
+    width: `${rect.width}px`,
+    height: `${rect.height}px`,
+    borderRadius: '0px'
+  }
+})
 
 const generateLooks = async () => {
   hasGenerated.value = true
@@ -109,17 +267,21 @@ const generateLooks = async () => {
 
     console.log("🔥 拿到后端真实数据了！", outfits);
     
+    const createLookItem = (rawItem, category = '推荐单品') => ({
+      filename: rawItem.filename,
+      title: rawItem.brand || 'Dress Select 严选单品',
+      brand: rawItem.brand || '未知品牌',
+      price: rawItem.price || '¥199',
+      category,
+      image: `${api.defaults.baseURL}/images/${rawItem.filename}`
+    })
+
     const formattedLooks = outfits.map((outfit, index) => {
       if (outfit.type === 'single' || outfit.type === 'one_piece') {
         return {
           id: index + 1,
           type: 'dress', 
-          items: [{ 
-            category: outfit.item.category || '推荐单品', 
-            brand: outfit.item.brand || '未知品牌', 
-            price: outfit.item.price || '¥299',
-            image: `${api.defaults.baseURL}/images/${outfit.item.filename}` 
-          }]
+          items: [createLookItem(outfit.item, outfit.item.category || '推荐单品')]
         }
       } 
       else if (outfit.type === 'combo') {
@@ -127,18 +289,8 @@ const generateLooks = async () => {
           id: index + 1,
           type: 'separate',
           items: [
-            { 
-              category: '上衣', 
-              brand: outfit.top.brand || '未知品牌', 
-              price: outfit.top.price || '¥199', 
-              image: `${api.defaults.baseURL}/images/${outfit.top.filename}` 
-            },
-            { 
-              category: '下装', 
-              brand: outfit.bottom.brand || '未知品牌', 
-              price: outfit.bottom.price || '¥259', 
-              image: `${api.defaults.baseURL}/images/${outfit.bottom.filename}` 
-            }
+            createLookItem(outfit.top, '上衣'),
+            createLookItem(outfit.bottom, '下装')
           ]
         }
       }
@@ -189,6 +341,242 @@ const selectedSummary = computed(() => {
 })
 
 const boardClasses = ['board-a', 'board-b', 'board-c', 'board-d']
+
+const fetchDetailMeta = async (filename) => {
+  isDetailLoading.value = true
+  try {
+    const res = await api.get(`/api/item/detail/${encodeURIComponent(filename)}`)
+    const payload = res.data
+
+    if (payload?.status !== 'success') {
+      throw new Error(payload?.message || '详情信息加载失败')
+    }
+
+    detailMeta.value = {
+      ...createEmptyDetailMeta(),
+      ...(payload.data || {})
+    }
+  } catch (error) {
+    console.error('加载衣服详情失败：', error)
+    detailMeta.value = createEmptyDetailMeta()
+  } finally {
+    isDetailLoading.value = false
+  }
+}
+
+const fetchDetailStats = async (filename) => {
+  try {
+    const res = await api.get(`/api/item/stats/${encodeURIComponent(filename)}`)
+    const payload = res.data
+
+    if (payload?.status !== 'success') {
+      throw new Error(payload?.message || '详情统计加载失败')
+    }
+
+    detailStats.value = {
+      ...createEmptyStats(),
+      ...(payload.data || {})
+    }
+  } catch (error) {
+    console.error('加载衣服统计失败：', error)
+    detailStats.value = createEmptyStats()
+  }
+}
+
+const postBehaviorRecord = async (duration = 0) => {
+  if (!selectedItem.value?.filename) return
+
+  const res = await api.post('/api/behavior/record', {
+    user_phone: getCurrentUserPhone(),
+    filename: selectedItem.value.filename,
+    stay_duration: Math.max(0, Math.round(duration)),
+    ...detailBehavior.value
+  })
+
+  const payload = res.data
+  if (payload?.status !== 'success') {
+    throw new Error(payload?.message || '行为记录失败')
+  }
+}
+
+const updateStatsForBehavior = (previousState, nextState) => {
+  if (nextState.is_like !== previousState.is_like) {
+    detailStats.value.total_likes = Math.max(
+      0,
+      detailStats.value.total_likes + (nextState.is_like ? 1 : -1)
+    )
+  }
+
+  if (nextState.is_collect !== previousState.is_collect) {
+    detailStats.value.total_collects = Math.max(
+      0,
+      detailStats.value.total_collects + (nextState.is_collect ? 1 : -1)
+    )
+  }
+
+  if (nextState.is_share && !previousState.is_share) {
+    detailStats.value.total_shares += 1
+  }
+}
+
+const flushDetailStay = async () => {
+  if (!selectedItem.value || !detailOpenedAt.value) return
+
+  const duration = Math.max(1, Math.round((Date.now() - detailOpenedAt.value) / 1000))
+
+  try {
+    await postBehaviorRecord(duration)
+    detailStats.value.total_views += 1
+    detailStats.value.total_stay_time += duration
+  } catch (error) {
+    console.error('记录停留时长失败：', error)
+  } finally {
+    detailOpenedAt.value = 0
+  }
+}
+
+const clearMotionTimer = () => {
+  if (motionTimer) {
+    window.clearTimeout(motionTimer)
+    motionTimer = null
+  }
+}
+
+const startDetailMotion = async (imageRect, imageSrc) => {
+  clearMotionTimer()
+  detailInfoVisible.value = false
+  detailImageVisible.value = !imageRect
+  motionImage.value = null
+
+  if (!imageRect) {
+    requestAnimationFrame(() => {
+      detailInfoVisible.value = true
+      detailImageVisible.value = true
+    })
+    return
+  }
+
+  await nextTick()
+  await new Promise((resolve) => requestAnimationFrame(() => resolve()))
+  await new Promise((resolve) => requestAnimationFrame(() => resolve()))
+
+  const targetRect =
+    detailImageRef.value?.getBoundingClientRect?.() ||
+    detailMediaFrameRef.value?.getBoundingClientRect?.()
+  if (!targetRect) {
+    detailInfoVisible.value = true
+    detailImageVisible.value = true
+    return
+  }
+
+  motionImage.value = {
+    src: imageSrc,
+    start: cloneRect(imageRect),
+    end: cloneRect(targetRect),
+    atEnd: false
+  }
+
+  await nextTick()
+
+  requestAnimationFrame(() => {
+    if (!motionImage.value) return
+    motionImage.value = {
+      ...motionImage.value,
+      atEnd: true
+    }
+    detailInfoVisible.value = true
+  })
+
+  motionTimer = null
+}
+
+const openItemDetail = async (item, event) => {
+  const imageEl = event?.currentTarget?.querySelector('.image-box')
+  const imageRect = imageEl?.getBoundingClientRect?.() || null
+
+  if (selectedItem.value?.filename === item.filename) return
+
+  if (selectedItem.value) {
+    await flushDetailStay()
+  }
+
+  selectedItem.value = { ...item }
+  detailMeta.value = createEmptyDetailMeta()
+  detailStats.value = createEmptyStats()
+  detailBehavior.value = getCachedBehavior(item.filename)
+  detailOpenedAt.value = Date.now()
+  document.body.style.overflow = 'hidden'
+  await startDetailMotion(imageRect, item.image)
+
+  await Promise.all([
+    fetchDetailMeta(item.filename),
+    fetchDetailStats(item.filename)
+  ])
+}
+
+const closeItemDetail = async () => {
+  clearMotionTimer()
+  await flushDetailStay()
+  motionImage.value = null
+  detailInfoVisible.value = false
+  detailImageVisible.value = true
+  selectedItem.value = null
+  detailMeta.value = createEmptyDetailMeta()
+  detailStats.value = createEmptyStats()
+  detailBehavior.value = createEmptyBehavior()
+  document.body.style.overflow = ''
+}
+
+const handleBehaviorToggle = async (field) => {
+  if (!selectedItem.value) return
+
+  const previousState = { ...detailBehavior.value }
+  const nextState = { ...detailBehavior.value }
+
+  if (field === 'is_share') {
+    if (nextState.is_share) return
+    nextState.is_share = true
+  } else {
+    nextState[field] = !nextState[field]
+  }
+
+  detailBehavior.value = nextState
+  setCachedBehavior(selectedItem.value.filename, nextState)
+  updateStatsForBehavior(previousState, nextState)
+
+  try {
+    await postBehaviorRecord(0)
+    if (field === 'is_share' && navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(selectedItem.value.image)
+    }
+  } catch (error) {
+    console.error('更新互动状态失败：', error)
+    detailBehavior.value = previousState
+    setCachedBehavior(selectedItem.value.filename, previousState)
+    updateStatsForBehavior(nextState, previousState)
+  }
+}
+
+const handleEscClose = (event) => {
+  if (event.key === 'Escape' && selectedItem.value) {
+    closeItemDetail()
+  }
+}
+
+onMounted(() => {
+  userPhone.value = localStorage.getItem('user_phone') || 'guest'
+  behaviorStateMap.value = parseBehaviorStorage()
+  window.addEventListener('keydown', handleEscClose)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleEscClose)
+  clearMotionTimer()
+  if (selectedItem.value) {
+    flushDetailStay()
+  }
+  document.body.style.overflow = ''
+})
 </script>
 
 <template>
@@ -320,6 +708,11 @@ const boardClasses = ['board-a', 'board-b', 'board-c', 'board-d']
                         v-for="(item, itemIndex) in look.items"
                         :key="`${look.id}-${itemIndex}`"
                         class="single-item-card"
+                        role="button"
+                        tabindex="0"
+                        @click="openItemDetail(item, $event)"
+                        @keydown.enter.prevent="openItemDetail(item, $event)"
+                        @keydown.space.prevent="openItemDetail(item, $event)"
                     >
                         <img
                             v-if="item.image"
@@ -337,7 +730,14 @@ const boardClasses = ['board-a', 'board-b', 'board-c', 'board-d']
                 </template>
 
                 <template v-else>
-                    <article class="single-item-card dress-card">
+                    <article
+                      class="single-item-card dress-card"
+                      role="button"
+                      tabindex="0"
+                      @click="openItemDetail(look.items[0], $event)"
+                      @keydown.enter.prevent="openItemDetail(look.items[0], $event)"
+                      @keydown.space.prevent="openItemDetail(look.items[0], $event)"
+                    >
                         <img
                             v-if="look.items[0].image"
                             :src="look.items[0].image"
@@ -356,6 +756,89 @@ const boardClasses = ['board-a', 'board-b', 'board-c', 'board-d']
         </div>
       </aside>
     </section>
+
+    <Transition name="detail-shell">
+      <div
+        v-if="selectedItem"
+        class="detail-layer"
+        @click.self="closeItemDetail"
+      >
+        <img
+          v-if="motionImage"
+          :src="motionImage.src"
+          alt=""
+          class="detail-motion-image"
+          :style="motionImageStyle"
+        />
+        <section class="detail-panel">
+          <button type="button" class="detail-close" @click="closeItemDetail" aria-label="关闭详情">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6 6 18 18M18 6 6 18" />
+            </svg>
+          </button>
+
+          <div class="detail-media">
+            <div ref="detailMediaFrameRef" class="detail-media-frame">
+              <img
+                ref="detailImageRef"
+                :src="selectedItem.image"
+                :alt="selectedItem.title"
+                class="detail-image"
+                :class="{ 'detail-image-hidden': !detailImageVisible }"
+              />
+            </div>
+          </div>
+
+          <div class="detail-info" :class="{ 'detail-info-visible': detailInfoVisible }">
+            <div class="detail-headline">
+              <div>
+                <h3>{{ detailMeta.brand || selectedItem.title }}</h3>
+                <p class="detail-price">{{ detailMeta.price || selectedItem.price }}</p>
+                <p v-if="normalizeGenderLabel(detailMeta.gender)" class="detail-gender-tag">
+                  {{ normalizeGenderLabel(detailMeta.gender) }}
+                </p>
+                <p class="detail-summary">
+                  {{ isDetailLoading ? '正在整理这件单品的搭配信息...' : detailSummary }}
+                </p>
+              </div>
+            </div>
+
+            <div class="detail-action-row">
+              <button
+                type="button"
+                class="engagement-btn"
+                :class="{ active: detailBehavior.is_like }"
+                @click.stop="handleBehaviorToggle('is_like')"
+              >
+                <span class="engagement-icon">♥</span>
+                <span>点赞</span>
+                <strong>{{ detailStats.total_likes }}</strong>
+              </button>
+              <button
+                type="button"
+                class="engagement-btn"
+                :class="{ active: detailBehavior.is_collect }"
+                @click.stop="handleBehaviorToggle('is_collect')"
+              >
+                <span class="engagement-icon">★</span>
+                <span>收藏</span>
+                <strong>{{ detailStats.total_collects }}</strong>
+              </button>
+              <button
+                type="button"
+                class="engagement-btn"
+                :class="{ active: detailBehavior.is_share }"
+                @click.stop="handleBehaviorToggle('is_share')"
+              >
+                <span class="engagement-icon">↗</span>
+                <span>{{ detailBehavior.is_share ? '已转发' : '转发' }}</span>
+                <strong>{{ detailStats.total_shares }}</strong>
+              </button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -633,6 +1116,19 @@ const boardClasses = ['board-a', 'board-b', 'board-c', 'board-d']
   border-radius: 22px;
   padding: 12px;
   box-shadow: 0 18px 28px rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+  outline: none;
+  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+}
+
+.single-item-card:hover {
+  transform: translateY(-4px);
+  border-color: #d4c2ad;
+  box-shadow: 0 20px 34px rgba(0, 0, 0, 0.11);
+}
+
+.single-item-card:focus-visible {
+  box-shadow: 0 0 0 3px rgba(122, 65, 52, 0.18), 0 20px 34px rgba(0, 0, 0, 0.11);
 }
 
 .dress-card {
@@ -707,6 +1203,243 @@ const boardClasses = ['board-a', 'board-b', 'board-c', 'board-d']
   line-height: 1.1;
 }
 
+.detail-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  padding: 32px;
+  background: rgba(33, 24, 15, 0.36);
+  backdrop-filter: blur(14px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.detail-motion-image {
+  position: fixed;
+  z-index: 82;
+  object-fit: contain;
+  filter: drop-shadow(0 18px 34px rgba(40, 26, 16, 0.12));
+  pointer-events: none;
+  will-change: top, left, width, height;
+  transition:
+    top 0.68s cubic-bezier(0.16, 0.9, 0.2, 1),
+    left 0.68s cubic-bezier(0.16, 0.9, 0.2, 1),
+    width 0.68s cubic-bezier(0.16, 0.9, 0.2, 1),
+    height 0.68s cubic-bezier(0.16, 0.9, 0.2, 1),
+    border-radius 0.68s cubic-bezier(0.16, 0.9, 0.2, 1),
+    opacity 0.26s ease;
+}
+
+.detail-panel {
+  position: relative;
+  width: min(1240px, 100%);
+  min-height: min(78vh, 760px);
+  max-height: min(88vh, 920px);
+  background: rgba(255, 252, 248, 0.98);
+  border: 1px solid rgba(235, 225, 213, 0.92);
+  border-radius: 30px;
+  box-shadow: 0 32px 70px rgba(19, 14, 10, 0.22);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(420px, 0.84fr);
+  overflow: hidden;
+}
+
+.detail-close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 1px solid rgba(223, 211, 197, 0.9);
+  background: rgba(255, 252, 247, 0.86);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 2;
+  transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+}
+
+.detail-close:hover {
+  transform: translateY(-1px);
+  background: #fff;
+  border-color: #d3c3af;
+}
+
+.detail-close svg {
+  width: 18px;
+  height: 18px;
+  stroke: #4d4032;
+  stroke-width: 2.1;
+  fill: none;
+  stroke-linecap: round;
+}
+
+.detail-media {
+  padding: 34px;
+  background:
+    radial-gradient(circle at 12% 12%, rgba(238, 226, 210, 0.78), transparent 260px),
+    linear-gradient(160deg, #f7f0e6 0%, #efe4d6 46%, #e7dbcc 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+
+.detail-media-frame {
+  width: 100%;
+  min-height: min(70vh, 680px);
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.22)),
+    rgba(249, 245, 239, 0.88);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 26px 48px rgba(72, 56, 39, 0.12);
+  padding: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.45s cubic-bezier(0.2, 0.75, 0.2, 1);
+}
+
+.detail-image {
+  width: 100%;
+  height: min(64vh, 620px);
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(0 18px 34px rgba(40, 26, 16, 0.12));
+  transition: transform 0.5s cubic-bezier(0.2, 0.75, 0.2, 1), opacity 0.35s ease;
+}
+
+.detail-image-hidden {
+  opacity: 0;
+}
+
+.detail-info {
+  padding: 42px 40px 42px 34px;
+  overflow-y: auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  opacity: 0;
+  transform: translateX(42px);
+  transition: opacity 0.46s ease 0.34s, transform 0.58s cubic-bezier(0.16, 0.9, 0.2, 1) 0.34s;
+}
+
+.detail-info-visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.detail-headline {
+  display: block;
+}
+
+.detail-info h3 {
+  margin: 0;
+  font-size: 42px;
+  line-height: 1.08;
+  color: #211a13;
+}
+
+.detail-price {
+  margin: 12px 0 0;
+  font-size: 30px;
+  font-weight: 800;
+  color: #7a4134;
+}
+
+.detail-gender-tag {
+  margin: 10px 0 0;
+  color: #7e6750;
+  font-size: 17px;
+  line-height: 1.6;
+  font-weight: 500;
+}
+
+.detail-summary {
+  margin: 16px 0 0;
+  color: #685f56;
+  font-size: 17px;
+  line-height: 1.85;
+  max-width: 520px;
+}
+
+.detail-action-row {
+  margin-top: 34px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  position: relative;
+}
+
+.engagement-btn {
+  min-height: 94px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  border: 1px solid #e5d8c8;
+  background: #fffdfa;
+  color: #4f4438;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.engagement-btn:hover {
+  transform: translateY(-2px);
+  border-color: #d1bea8;
+  box-shadow: 0 14px 24px rgba(56, 41, 23, 0.08);
+}
+
+.engagement-btn.active {
+  border-color: rgba(122, 65, 52, 0.3);
+  background: rgba(122, 65, 52, 0.08);
+  color: #7a4134;
+}
+
+.engagement-icon {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.engagement-btn span:not(.engagement-icon) {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.engagement-btn strong {
+  font-size: 30px;
+  line-height: 1.1;
+}
+
+.detail-shell-enter-active,
+.detail-shell-leave-active {
+  transition: opacity 0.28s ease;
+}
+
+.detail-shell-enter-active .detail-panel,
+.detail-shell-leave-active .detail-panel {
+  transition: transform 0.42s cubic-bezier(0.2, 0.75, 0.2, 1), opacity 0.35s ease;
+}
+
+.detail-shell-enter-from,
+.detail-shell-leave-to {
+  opacity: 0;
+}
+
+.detail-shell-enter-from .detail-panel,
+.detail-shell-leave-to .detail-panel {
+  transform: translateY(24px) scale(0.97);
+  opacity: 0;
+}
+
 @media (max-width: 1500px) {
   .workspace {
     grid-template-columns: 1fr;
@@ -730,6 +1463,23 @@ const boardClasses = ['board-a', 'board-b', 'board-c', 'board-d']
     transform: none !important;
     animation: none;
   }
+
+  .detail-panel {
+    grid-template-columns: 1fr;
+    max-height: 92vh;
+  }
+
+  .detail-media {
+    padding: 24px 24px 0;
+  }
+
+  .detail-media-frame {
+    min-height: 360px;
+  }
+
+  .detail-image {
+    height: 320px;
+  }
 }
 
 @media (max-width: 980px) {
@@ -740,6 +1490,38 @@ const boardClasses = ['board-a', 'board-b', 'board-c', 'board-d']
   .action-row {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .detail-layer {
+    padding: 16px;
+  }
+
+  .detail-panel {
+    border-radius: 24px;
+  }
+
+  .detail-media {
+    padding: 20px 20px 0;
+  }
+
+  .detail-info {
+    padding: 28px 20px 24px;
+  }
+
+  .detail-headline {
+    display: block;
+  }
+
+  .detail-info h3 {
+    font-size: 34px;
+  }
+
+  .detail-price {
+    font-size: 26px;
+  }
+
+  .detail-action-row {
+    grid-template-columns: 1fr;
   }
 }
 
