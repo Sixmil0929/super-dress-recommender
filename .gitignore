@@ -28,10 +28,18 @@ P5_Dataset/
 # 忽略 Python 虚拟环境
 .venv/
 
+# 前端依赖与构建产物
+frontend/node_modules/
+frontend/dist/
+
 # 前端 public/editorial 目录下的 JPG 资源允许纳入版本管理
-!super-dress-recommender/frontend/public/
-!super-dress-recommender/frontend/public/editorial/
-!super-dress-recommender/frontend/public/editorial/*.jpg
+!frontend/public/
+!frontend/public/editorial/
+!frontend/public/editorial/*.jpg
 
 # 忽略vscode文件夹下的个人设置
 .vscode/*
+
+# 其他 IDE / 工具目录
+.idea/
+.codex/

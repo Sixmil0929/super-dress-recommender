@@ -532,7 +532,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-BACKEND_APP_DIR = os.path.join(BASE_DIR, "super-dress-recommender", "backend", "app")
+BACKEND_APP_DIR = os.path.join(BASE_DIR, "backend", "app")
 if BACKEND_APP_DIR not in sys.path:
     sys.path.append(BACKEND_APP_DIR)
 
